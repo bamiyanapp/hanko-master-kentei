@@ -34,14 +34,10 @@ jobs:
         run: npm install # package-lock.jsonがない場合はciではなくinstall
       - name: Validate current commit (last commit)
         if: github.event_name == 'push'
-        run: |
-          npm run lint -w frontend -- --dir .
-          npm run lint -w backend
+        run: npm run lint
       - name: Validate PR commits
         if: github.event_name == 'pull_request'
-        run: |
-          npm run lint -w frontend -- --dir .
-          npm run lint -w backend
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
   frontend-test:
     needs: commitlint

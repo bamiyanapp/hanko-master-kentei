@@ -6,7 +6,11 @@
     "backend"
   ],
   "scripts": {
-    "lint": "npm run lint -w frontend && npm run lint -w backend",
+    "lint": "commitlint --last --verbose",
     "test": "npm run test -w frontend && npm run test -w backend"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.3.0",
+    "@commitlint/config-conventional": "^19.2.2"
   }
 }
