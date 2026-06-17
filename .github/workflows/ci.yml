@@ -22,8 +22,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
-          cache: "npm"
+          node-version: "20"
+
       - name: Branch check
         run: |
           if [ "$GITHUB_REF" = "refs/heads/release" ]; then
@@ -146,5 +146,5 @@ jobs:
           # Release を Main と完全一致させる
           git reset --hard origin/main
           git tag --contains HEAD
-          # release を main と完全一致させる
+          # release を main と completely 一致させる
           git push origin release --force --tags
