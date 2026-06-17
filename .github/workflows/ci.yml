@@ -196,7 +196,7 @@ jobs:
         with:
           fetch-depth: 0
           # GITHUB_TOKEN を使うと push / commit が他の workflow をトリガーしない
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Sync main to release branch
         run: |
           git config --global user.name "github-actions[bot]"
