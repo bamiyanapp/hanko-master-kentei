@@ -35,14 +35,14 @@ jobs:
       - name: Validate current commit (last commit)
         if: github.event_name == 'push'
         run: |
-          npm run lint || true
+          npm run lint
       - name: Validate PR commits
         if: github.event_name == 'pull_request'
         run: |
-          npm run lint || true
+          npm run lint
 
   test:
-    # needs: commitlint
+    needs: commitlint
     runs-on: ubuntu-latest
     strategy:
       matrix:
