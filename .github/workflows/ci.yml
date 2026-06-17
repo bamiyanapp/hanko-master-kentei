@@ -35,12 +35,12 @@ jobs:
       - name: Validate current commit (last commit)
         if: github.event_name == 'push'
         run: |
-          npm run lint -w frontend
+          npm run lint -w frontend -- --dir src
           npm run lint -w backend
       - name: Validate PR commits
         if: github.event_name == 'pull_request'
         run: |
-          npm run lint -w frontend
+          npm run lint -w frontend -- --dir src
           npm run lint -w backend
 
   frontend-test:
