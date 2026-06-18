@@ -4,7 +4,7 @@ run-name: CD ${{ github.event.head_commit.message }}
 on:
   push:
     branches:
-      - release
+      - main
 permissions:
   contents: write
   issues: write
@@ -26,80 +26,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: release
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.BOT_TOKEN != '' && secrets.BOT_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Sync main to release branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+          # releaseブランチをチェックアウト、または作成
+          git checkout release || git checkout -b release
+          git reset --hard origin/main
+          git push origin release --force --tags
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install dependencies
         run: npm install
-  
-      - name: Fetch tags
-        run: |
-          git fetch origin --tags --prune
-          git fetch origin
-          git log origin/main --oneline -5
-          git log origin/release --oneline -5
-          git rev-parse release
-          git rev-parse origin/release
-
-    # Release が Main の最新と同じか確認
-      - name: Sync check
-        id: sync
-        run: |
-          git fetch origin main
-          MAIN_HEAD=$(git rev-parse origin/main)
-          RELEASE_HEAD=$(git rev-parse release)
-          echo "MAIN_HEAD=$MAIN_HEAD" >> $GITHUB_ENV
-          echo "RELEASE_HEAD=$RELEASE_HEAD" >> $GITHUB_ENV
-          if [ "$MAIN_HEAD" = "$RELEASE_HEAD" ]; then
-            echo "Release is up-to-date with main"
-            echo "up_to_date=true" >> $GITHUB_ENV
-          else
-            echo "Release needs to merge main"
-            echo "up_to_date=false" >> $GITHUB_ENV
-          fi
-      # 必要ならマージ
-      - name: Merge main into release if needed
-        if: env.up_to_date == 'false'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git merge --no-ff origin/main -m "Chore: Merge main into release"
-          git push origin release
-      # Release 上の HEAD に既にタグがあるか確認
-      - name: Check for existing tags
-        id: tag_check
-        run: |
-          TAGS=$(git tag --contains HEAD | grep "^v" || true)
-          if [ -n "$TAGS" ]; then
-            echo "HEAD already has tags: $TAGS"
-            echo "tag_exists=true" >> $GITHUB_ENV
-          else
-            echo "No tags on HEAD"
-            echo "tag_exists=false" >> $GITHUB_ENV
-          fi
-
-      - name: Skip if release branch has no new commits
-        run: |
-          if git tag --contains HEAD | grep -q "v"; then
-            echo "Release branch already contains latest tag(s). Skipping release."
-            exit 0
-          fi
-      - name: Checkout release branch
-        run: git checkout release
-      - name: Merge main into release
-        run: |
-          # Fast-forward マージ
-          git merge --ff-only origin/main || echo "Already up to date"
-      - name: Skip if no new commits
-        run: |
-          if git tag --contains HEAD | grep -q "v"; then
-            echo "Release branch already contains latest tag(s). Skipping release."
-            exit 0
-          fi
       - name: Dry-run Semantic-release
         id: dryrun
         env:
