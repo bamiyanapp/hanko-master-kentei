@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 
+import { useEffect } from 'react';
+
 export default function Home() {
   const [isStarted, setIsStarted] = useState(false);
   const [angle, setAngle] = useState(0); // 角度（度数法：-180 〜 180）
@@ -9,12 +11,54 @@ export default function Home() {
   const [resultMessage, setResultMessage] = useState('');
   const [isPassed, setIsPassed] = useState(false);
 
+  // URLパラメータと状態の同期用関数
+  const updateUrl = (started: boolean, currentAngle: number, currentJudged: boolean) => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams();
+    if (started) {
+      params.set('started', 'true');
+      if (currentAngle !== 0) {
+        params.set('angle', currentAngle.toString());
+      }
+      if (currentJudged) {
+        params.set('judged', 'true');
+      }
+    }
+    const newSearch = params.toString();
+    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+    window.history.pushState(null, '', newUrl);
+  };
+
+  // マウント時にURLパラメータから状態を復元
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    
+    const startedParam = params.get('started') === 'true';
+    const angleParam = Number(params.get('angle') || 0);
+    const judgedParam = params.get('judged') === 'true';
+    
+    if (startedParam) {
+      setIsStarted(true);
+    }
+    if (angleParam !== 0) {
+      setAngle(angleParam);
+    }
+    if (judgedParam) {
+      setJudged(true);
+      const result = judgeHankoAngle(angleParam);
+      setIsPassed(result.isPassed);
+      setResultMessage(result.message);
+    }
+  }, []);
+
   const handleStart = () => {
     setIsStarted(true);
     setAngle(0);
     setJudged(false);
     setResultMessage('');
     setIsPassed(false);
+    updateUrl(true, 0, false);
   };
 
   const handleJudge = () => {
@@ -22,6 +66,7 @@ export default function Home() {
     const result = judgeHankoAngle(angle);
     setIsPassed(result.isPassed);
     setResultMessage(result.message);
+    updateUrl(isStarted, angle, true);
   };
 
   const handleReset = () => {
@@ -29,6 +74,12 @@ export default function Home() {
     setJudged(false);
     setResultMessage('');
     setIsPassed(false);
+    updateUrl(isStarted, 0, false);
+  };
+
+  const handleBackToTop = () => {
+    setIsStarted(false);
+    updateUrl(false, 0, false);
   };
 
   if (isStarted) {
@@ -45,7 +96,7 @@ export default function Home() {
               </h2>
             </div>
             <button
-              onClick={() => setIsStarted(false)}
+              onClick={handleBackToTop}
               className="text-gray-500 hover:text-gray-700 text-sm font-medium"
             >
               戻る
@@ -158,7 +209,11 @@ export default function Home() {
                   min="-90"
                   max="90"
                   value={angle}
-                  onChange={(e) => setAngle(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newAngle = Number(e.target.value);
+                    setAngle(newAngle);
+                    updateUrl(isStarted, newAngle, judged);
+                  }}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-600"
                 />
                 <div className="flex justify-between text-xs text-gray-400 px-1 mt-1">
@@ -185,7 +240,7 @@ export default function Home() {
               </button>
               {isPassed && (
                 <button
-                  onClick={() => setIsStarted(false)}
+                  onClick={handleBackToTop}
                   className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors shadow-sm"
                 >
                   メイン画面へ戻る
