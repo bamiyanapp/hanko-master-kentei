@@ -186,26 +186,3 @@ jobs:
                 console.error(`Failed to delete branch ${branchName}:`, error.message);
               }
             }
-
-  sync-release:
-    needs: [merge]
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          # GITHUB_TOKEN を使うと push / commit が他の workflow をトリガーしない
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Sync main to release branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch --tags origin
-          # ローカル release にチェックアウト
-          git checkout release
-          # Release を Main と完全一致させる
-          git reset --hard origin/main
-          git tag --contains HEAD
-          # release を main と completely 一致させる
-          git push origin release --force --tags
