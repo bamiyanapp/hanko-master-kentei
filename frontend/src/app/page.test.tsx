@@ -2,13 +2,16 @@ import { describe, it, expect, vi } from 'vitest';
 import Home, { judgeHankoAngle } from './page';
 import React from 'react';
 
-// useStateを使用するクライアントコンポーネントを直接テストするため、useStateをモック化します。
+// useState, useEffectを使用するクライアントコンポーネントを直接テストするため、モック化します。
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
   return {
     ...actual,
     useState: (initialValue: unknown) => {
       return [initialValue, vi.fn()];
+    },
+    useEffect: (callback: () => void) => {
+      // テスト環境でuseEffectの即時実行やエラー回避のためにモックします
     },
   };
 });
