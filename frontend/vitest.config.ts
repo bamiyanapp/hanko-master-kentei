@@ -6,6 +6,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*'],
+      exclude: [
+        'src/app/layout.tsx',
+        'src/app/globals.css',
+      ],
       thresholds: {
         statements: 20,
         branches: 20,
