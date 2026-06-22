@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import Home, { judgeHankoAngle } from './page';
+import Home, { judgeHankoAngle, judgePvP } from './page';
 import React from 'react';
 
 // window オブジェクトのモック
@@ -118,6 +118,10 @@ describe('Home Component Integration', () => {
       vi.fn(), // judged
       vi.fn(), // resultMessage
       vi.fn(), // isPassed
+      vi.fn(), // isPvP
+      vi.fn(), // pvpStep
+      vi.fn(), // p1Angle
+      vi.fn(), // p2Angle
     ];
     registeredEffects = [];
     mockLocation.search = '';
@@ -251,5 +255,113 @@ describe('judgeHankoAngle', () => {
     const result = judgeHankoAngle(-50);
     expect(result.isPassed).toBe(false);
     expect(result.message).toContain('傾けすぎ');
+  });
+});
+
+describe('judgePvP', () => {
+  it('should declare p1 winner if p1 is passed and p2 is failed', () => {
+    const result = judgePvP(-20, 0);
+    expect(result.winner).toBe('p1');
+    expect(result.message).toContain('プレイヤー1（鈴木）の勝利');
+  });
+
+  it('should declare p2 winner if p1 is failed and p2 is passed', () => {
+    const result = judgePvP(10, -20);
+    expect(result.winner).toBe('p2');
+    expect(result.message).toContain('プレイヤー2（佐藤）の勝利');
+  });
+
+  it('should declare draw if both fail', () => {
+    const result = judgePvP(0, 10);
+    expect(result.winner).toBe('draw');
+    expect(result.message).toContain('両者差し戻し');
+  });
+
+  it('should compare score and declare closer one winner if both pass', () => {
+    // 理想の角度は -22度。-20度（差2度） vs -30度（差8度） -> p1勝ち
+    const result = judgePvP(-20, -30);
+    expect(result.winner).toBe('p1');
+    expect(result.message).toContain('理想のお辞儀（-22度）に近く');
+  });
+});
+
+describe('Home Component PvP Flow', () => {
+  beforeEach(() => {
+    useStateCallCount = 0;
+    stateValues = [];
+    stateSetters = [
+      vi.fn(), // isStarted
+      vi.fn(), // angle
+      vi.fn(), // judged
+      vi.fn(), // resultMessage
+      vi.fn(), // isPassed
+      vi.fn(), // isPvP
+      vi.fn(), // pvpStep
+      vi.fn(), // p1Angle
+      vi.fn(), // p2Angle
+    ];
+    registeredEffects = [];
+    mockLocation.search = '';
+    mockPushState.mockClear();
+  });
+
+  it('should start PvP mode from top page', () => {
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement;
+    
+    const pvpButton = findByText(result, '対戦モードを開始する');
+    expect(pvpButton).toBeDefined();
+
+    pvpButton.props.onClick();
+    expect(stateSetters[0]).toHaveBeenCalledWith(true); // isStarted -> true
+    expect(stateSetters[5]).toHaveBeenCalledWith(true); // isPvP -> true
+    expect(stateSetters[6]).toHaveBeenCalledWith('p1_turn'); // pvpStep -> 'p1_turn'
+  });
+
+  it('should render P1 turn interface and transition to P2 turn', () => {
+    // states: isStarted=true, angle=0, judged=false, resultMessage='', isPassed=false, isPvP=true, pvpStep='p1_turn', p1Angle=0, p2Angle=0
+    stateValues = [true, 0, false, '', false, true, 'p1_turn', 0, 0];
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement;
+
+    const banner = findByText(result, '誠意の限界捺印バトル（2人対戦）');
+    expect(banner).toBeDefined();
+
+    const turnLabel = findByText(result, '【プレイヤー1（鈴木）の番】');
+    expect(turnLabel).toBeDefined();
+
+    // P1 angle slider adjustment
+    const input = findType(result, 'input');
+    expect(input).toBeDefined();
+    input.props.onChange({ target: { value: '-22' } });
+    expect(stateSetters[7]).toHaveBeenCalledWith(-22); // setP1Angle(-22)
+
+    // Submit P1
+    const submitBtn = findByText(result, 'プレイヤー1が捺印を決定');
+    expect(submitBtn).toBeDefined();
+    submitBtn.props.onClick();
+    expect(stateSetters[6]).toHaveBeenCalledWith('p2_turn');
+  });
+
+  it('should render P2 turn interface and submit to result', () => {
+    // states: isStarted=true, angle=0, judged=false, resultMessage='', isPassed=false, isPvP=true, pvpStep='p2_turn', p1Angle=-22, p2Angle=0
+    stateValues = [true, 0, false, '', false, true, 'p2_turn', -22, 0];
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement;
+
+    const turnLabel = findByText(result, '【プレイヤー2（佐藤）の番】');
+    expect(turnLabel).toBeDefined();
+
+    // P2 angle slider adjustment
+    const input = findType(result, 'input');
+    expect(input).toBeDefined();
+    input.props.onChange({ target: { value: '-10' } });
+    expect(stateSetters[8]).toHaveBeenCalledWith(-10); // setP2Angle(-10)
+
+    // Submit P2
+    const submitBtn = findByText(result, 'プレイヤー2が捺印を決定');
+    expect(submitBtn).toBeDefined();
+    submitBtn.props.onClick();
+    expect(stateSetters[6]).toHaveBeenCalledWith('result');
   });
 });
