@@ -154,7 +154,7 @@ export default function Home() {
   if (isStarted) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-24 bg-gray-50">
-            <div className="w-full max-w-2xl bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+        <div className="w-full max-w-2xl bg-white rounded-xl shadow-md p-6 border border-gray-200">
           <div className="flex justify-between items-center border-b pb-4 mb-6">
             <div>
               <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded">
@@ -246,9 +246,9 @@ export default function Home() {
                             transform: `rotate(${p1Angle}deg)`,
                             transition: pvpStep !== 'p1_turn' ? 'transform 0.5s ease' : 'none',
                           }}
-                    className={`w-12 h-12 rounded-full border-2 border-red-500 flex items-center justify-center text-red-500 font-bold select-none ${
-                      pvpStep !== 'p1_turn' ? 'opacity-100' : 'opacity-60 animate-pulse'
-                    }`}
+                          className={`w-12 h-12 rounded-full border-2 border-red-500 flex items-center justify-center text-red-500 font-bold select-none ${
+                            pvpStep !== 'p1_turn' ? 'opacity-100' : 'opacity-40 animate-pulse'
+                          }`}
                         >
                           <span className="text-sm tracking-widest leading-none block transform scale-90">
                             鈴木
@@ -268,7 +268,7 @@ export default function Home() {
                               transition: pvpStep === 'result' ? 'transform 0.5s ease' : 'none',
                             }}
                             className={`w-12 h-12 rounded-full border-2 border-red-500 flex items-center justify-center text-red-500 font-bold select-none ${
-                              pvpStep === 'result' ? 'opacity-100' : 'opacity-60 animate-pulse'
+                              pvpStep === 'result' ? 'opacity-100' : 'opacity-40 animate-pulse'
                             }`}
                           >
                             <span className="text-sm tracking-widest leading-none block transform scale-90">
@@ -303,7 +303,7 @@ export default function Home() {
                             transition: judged ? 'transform 0.5s ease' : 'none',
                           }}
                           className={`w-12 h-12 rounded-full border-2 border-red-500 flex items-center justify-center text-red-500 font-bold select-none ${
-                            judged ? 'opacity-100' : 'opacity-60 animate-pulse'
+                            judged ? 'opacity-100' : 'opacity-40 animate-pulse'
                           }`}
                         >
                           <span className="text-sm tracking-widest leading-none block transform scale-90">
@@ -506,13 +506,13 @@ export default function Home() {
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={handleStart}
-            className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-xl hover:bg-red-700 hover:scale-105 active:scale-95 transition-all duration-200 shadow-md hover:shadow-red-100"
+            className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-xl hover:bg-red-700 hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-red-200"
           >
             検定を開始する (1人)
           </button>
           <button
             onClick={handleStartPvP}
-            className="px-8 py-4 bg-amber-600 text-white text-lg font-bold rounded-xl hover:bg-amber-700 hover:scale-105 active:scale-95 transition-all duration-200 shadow-md hover:shadow-amber-100"
+            className="px-8 py-4 bg-amber-600 text-white text-lg font-bold rounded-xl hover:bg-amber-700 hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-amber-200"
           >
             対戦モードを開始する (2人)
           </button>
