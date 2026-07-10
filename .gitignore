@@ -30,5 +30,5 @@ Thumbs.db
 .env
 .env.*
 
-# Backup files
-backend/karuta-phrases-backup.json
+# commit skill が下書きに使う一時ファイル
+commit_msg*.txt
