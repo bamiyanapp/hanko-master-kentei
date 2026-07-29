@@ -16,32 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page-url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Set up Node.js
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: 24
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm install
-      - name: Build
-        working-directory: frontend
-        run: npm run build
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: frontend/out
-      - name: 🚀 Deploy to GitHub Pages
+      - name: 🚀 Build and deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: bamiyanapp/dev-standards/.github/actions/deploy-github-pages@v1.13.0
+        with:
+          working-directory: frontend
+          node-version: "24"
+          artifact-path: frontend/out
+          workspaces: true
       - name: Show GitHub Pages URL
         run: |
-          echo "Pages URL: ${{ steps.deployment.outputs.page_url }}"
+          echo "Pages URL: ${{ steps.deployment.outputs.page-url }}"
 
   deploy-backend:
     runs-on: ubuntu-latest
