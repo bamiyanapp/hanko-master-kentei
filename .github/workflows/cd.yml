@@ -46,9 +46,9 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: npm install
-      - name: 🚀 Deploy Backend (Serverless Framework)
+      - name: 🚀 Deploy Backend (OSLS)
         working-directory: backend
-        run: npx serverless deploy
+        run: npx osls deploy
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
