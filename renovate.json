@@ -3,5 +3,13 @@
   "extends": ["config:recommended"],
   "git-submodules": {
     "enabled": true
-  }
+  },
+  "packageRules": [
+    {
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false,
+      "description": "typescript 7系はexportsの`.`がlib/version.cjsのみを指し、next buildが依存する旧来のコンパイラAPIを提供しないため、next（現行stable 16.2.12）が非対応の間はメジャー更新を保留する（issue #91）"
+    }
+  ]
 }
