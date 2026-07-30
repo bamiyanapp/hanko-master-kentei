@@ -7,8 +7,8 @@
 
 ## CI（`.github/workflows/ci.yml`）
 
-`dev-standards` の `reusable-ci.yml` を呼び出す（`node_version: "24"` / `workspaces: true` / `enable_release_sync: false`）。
-本リポジトリは semantic-release によるバージョン管理・リリースを行わないため、`enable_release` は指定せず既定値のまま利用する。
+`dev-standards` の `reusable-ci.yml` を呼び出す（`node_version: "24"` / `workspaces: true`）。
+本リポジトリは semantic-release によるバージョン管理・リリースを行わないため、非推奨input `enable_release`（reusable-cd.ymlへ移動済み）は指定しない。
 
 ## CD（`.github/workflows/cd.yml`）
 
@@ -17,8 +17,8 @@ frontend・backendを直接デプロイする独自ワークフローを持つ�
 
 ### frontend（GitHub Pages）
 
-- `frontend` で `npm run build`（Next.jsの静的エクスポート、出力先 `frontend/out`）
-- `actions/upload-pages-artifact` → `actions/deploy-pages` でGitHub Pagesへデプロイ
+- dev-standardsの共通複合action `deploy-github-pages`（タグ固定参照、`workspaces: true`）を呼び出す
+- リポジトリルートで `npm ci`（npm workspaces構成のため） → `frontend` で `npm run build`（Next.jsの静的エクスポート、出力先 `frontend/out`） → `actions/upload-pages-artifact` → `actions/deploy-pages` でGitHub Pagesへデプロイ
 
 ### backend（Serverless Framework / AWS Lambda）
 
