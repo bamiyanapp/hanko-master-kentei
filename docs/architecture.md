@@ -1,13 +1,13 @@
 # システムアーキテクチャ設計
 
 ## 1. 構成概要
-本システムは React (Next.js) をフロントエンドに、AWS Lambda と DynamoDB をバックエンドに使用したサーバーレスアーキテクチャで構成される。インフラ管理には Serverless Framework を使用する。
+本システムは React (Next.js) をフロントエンドに、AWS Lambda と DynamoDB をバックエンドに使用したサーバーレスアーキテクチャで構成される。インフラ管理には OSLS（Serverless Framework互換のOSSフォーク、`serverless.yml`形式の設定を引き継ぐ）を使用する。
 
 ## 2. 技術スタック
 - **Frontend**: Next.js (React), TypeScript, Tailwind CSS
 - **Backend**: AWS Lambda, API Gateway
 - **Database**: DynamoDB
-- **Infrastructure**: Serverless Framework
+- **Infrastructure**: OSLS（Serverless Framework互換のOSSフォーク）
 - **AI Integration**: OpenAI API / Gemini API (将来)
 
 ## 3. コンポーネント構成
@@ -37,5 +37,5 @@ graph TD
 ```
 
 ## 5. デプロイフロー
-1. Serverless Framework (`sls deploy`) により AWS リソース（Lambda, API Gateway, DynamoDB）を構築。
+1. OSLS (`osls deploy`) により AWS リソース（Lambda, API Gateway, DynamoDB）を構築。
 2. フロントエンドは別途ホスティング環境（Vercel推奨）へデプロイ。

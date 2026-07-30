@@ -20,14 +20,15 @@ frontend・backendを直接デプロイする独自ワークフローを持つ�
 - dev-standardsの共通複合action `deploy-github-pages`（タグ固定参照、`workspaces: true`）を呼び出す
 - リポジトリルートで `npm ci`（npm workspaces構成のため） → `frontend` で `npm run build`（Next.jsの静的エクスポート、出力先 `frontend/out`） → `actions/upload-pages-artifact` → `actions/deploy-pages` でGitHub Pagesへデプロイ
 
-### backend（Serverless Framework / AWS Lambda）
+### backend（OSLS / AWS Lambda）
 
-- `backend` で `npx serverless deploy`（`serverless.yml` に基づきAWS Lambda / API Gatewayを構築、region: `ap-northeast-1`）
+- `backend` で `npx osls deploy`（`serverless.yml` に基づきAWS Lambda / API Gatewayを構築、region: `ap-northeast-1`）
+- OSLS（[oss-serverless/osls](https://github.com/oss-serverless/osls)）はServerless Framework互換のOSSフォークで、`serverless.yml`の設定形式・CLIコマンド体系をそのまま引き継ぐ。Serverless Framework v4以降が要求するサインイン・ライセンスキーが不要なため採用している（issue #96）
 - デプロイ後、`node seed.js` でDynamoDBへ初期データを投入
 
 ### 環境変数（プロダクト固有）
 
 | 変数名 | 説明 |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | backendデプロイ（`serverless deploy`）・seed投入（`seed.js`）で使用するAWS認証情報 |
+| `AWS_ACCESS_KEY_ID` | backendデプロイ（`osls deploy`）・seed投入（`seed.js`）で使用するAWS認証情報 |
 | `AWS_SECRET_ACCESS_KEY` | 同上 |
