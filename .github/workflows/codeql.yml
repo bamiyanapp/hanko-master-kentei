@@ -1,0 +1,14 @@
+name: CodeQL
+run-name: CodeQL ${{ github.event.head_commit.message || github.event.pull_request.title }}
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: "0 0 * * 1"
+
+jobs:
+  codeql:
+    uses: bamiyanapp/dev-standards/.github/workflows/reusable-codeql.yml@v1.14.0

@@ -25,7 +25,8 @@ export default function Home() {
       }
     }
     const newSearch = params.toString();
-    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+    const queryString = newSearch ? `?${newSearch}` : '';
+    const newUrl = `${window.location.pathname}${queryString}`;
     window.history.pushState(null, '', newUrl);
   };
 

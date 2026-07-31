@@ -14,5 +14,8 @@ jobs:
     with:
       node_version: "24"
       workspaces: true
+      enable_duplication_check: true
+      duplication_threshold: 5
+      coverage_threshold: 70
     secrets:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
