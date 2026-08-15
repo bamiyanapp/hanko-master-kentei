@@ -37,21 +37,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Set up Node.js
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: 24
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-      - name: Install dependencies
-        working-directory: backend
-        run: npm install
       - name: 🚀 Deploy Backend (OSLS)
-        working-directory: backend
-        run: npx osls deploy
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        uses: bamiyanapp/dev-standards/.github/actions/deploy-serverless@v1.23.0
+        with:
+          working-directory: backend
+          node-version: "24"
+          deploy-command: npx osls deploy
+          workspaces: true
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: 🌱 Seed Database
         working-directory: backend
         run: node seed.js
