@@ -2,6 +2,7 @@
   "symlinks": [
     { "source": "shared/sfx/click.mp3", "target": "frontend/public/sfx/click.mp3" },
     { "source": "shared/sfx/success.mp3", "target": "frontend/public/sfx/success.mp3" },
-    { "source": "shared/sfx/failure.mp3", "target": "frontend/public/sfx/failure.mp3" }
+    { "source": "shared/sfx/failure.mp3", "target": "frontend/public/sfx/failure.mp3" },
+    { "source": "shared/pwa/sw.js", "target": "frontend/public/sw.js" }
   ]
 }
