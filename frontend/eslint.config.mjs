@@ -1,6 +1,7 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import sonarjs from "eslint-plugin-sonarjs";
+import globals from "globals";
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -14,6 +15,15 @@ export default tseslint.config(
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "off",
       complexity: ["error", 10],
+    },
+  },
+  {
+    // Service Worker（public/配下、ビルド時に加工されずそのままコピーされる）は
+    // ブラウザのウィンドウコンテキストとはグローバルが異なる
+    // （dev-standards共通sw.js・プロダクト固有sw-config.jsの両方が対象）
+    files: ["public/sw.js", "public/sw-config.js"],
+    languageOptions: {
+      globals: globals.serviceworker,
     },
   },
   {
