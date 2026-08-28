@@ -38,7 +38,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: 🚀 Deploy Backend (OSLS)
-        uses: bamiyanapp/dev-standards/.github/actions/deploy-serverless@v1.23.0
+        uses: bamiyanapp/dev-standards/.github/actions/deploy-serverless@v1.24.0
         with:
           working-directory: backend
           node-version: "24"
