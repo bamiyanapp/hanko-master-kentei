@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 
 import { useEffect } from 'react';
+import { playClickSound, playSuccessSound, playFailureSound } from './sfx';
 
 export default function Home() {
   const [isStarted, setIsStarted] = useState(false);
@@ -54,6 +55,7 @@ export default function Home() {
   }, []);
 
   const handleStart = () => {
+    playClickSound();
     setIsStarted(true);
     setAngle(0);
     setJudged(false);
@@ -68,9 +70,15 @@ export default function Home() {
     setIsPassed(result.isPassed);
     setResultMessage(result.message);
     updateUrl(isStarted, angle, true);
+    if (result.isPassed) {
+      playSuccessSound();
+    } else {
+      playFailureSound();
+    }
   };
 
   const handleReset = () => {
+    playClickSound();
     setAngle(0);
     setJudged(false);
     setResultMessage('');
@@ -79,6 +87,7 @@ export default function Home() {
   };
 
   const handleBackToTop = () => {
+    playClickSound();
     setIsStarted(false);
     updateUrl(false, 0, false);
   };
