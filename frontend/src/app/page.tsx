@@ -264,21 +264,21 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-24 bg-gradient-to-b from-red-50 to-white">
-      <div className="text-center max-w-xl">
-        <div className="inline-block bg-red-100 border border-red-200 rounded-full p-2 mb-6 shadow-sm">
-          <span className="text-3xl">💮</span>
+    <main className="d-flex min-vh-100 flex-column align-items-center justify-content-center p-4 p-md-5 hero-gradient">
+      <div className="text-center mx-auto" style={{ maxWidth: '36rem' }}>
+        <div className="d-inline-block bg-danger-subtle border border-danger-subtle rounded-circle p-2 mb-4 shadow-sm">
+          <span className="fs-2">💮</span>
         </div>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">
+        <h1 className="display-5 fw-bold">
           ハンコマスター検定
         </h1>
-        <p className="mt-4 text-lg md:text-xl text-gray-600 leading-relaxed">
+        <p className="mt-3 fs-5 text-secondary">
           誠意ある捺印こそが、社会人の基本です。
           あなたの「捺印マナー力」を今こそ証明しましょう。
         </p>
         <button
           onClick={handleStart}
-          className="mt-10 px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-xl hover:bg-red-700 hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-red-200"
+          className="btn btn-danger btn-lg mt-5 px-4 py-3 fw-bold shadow"
         >
           検定を開始する
         </button>
