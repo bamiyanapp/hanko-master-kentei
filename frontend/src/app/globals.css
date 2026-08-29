@@ -5,6 +5,13 @@
   background: linear-gradient(to bottom, #fef2f2, #ffffff);
 }
 
+/* クイズ画面の稟議書プレビュー枠（Bootstrapに破線ボーダーのユーティリティが無いため個別定義、issue #226） */
+.doc-preview {
+  border: 2px dashed #dee2e6;
+  border-radius: 0.5rem;
+  min-height: 250px;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
