@@ -94,170 +94,181 @@ export default function Home() {
 
   if (isStarted) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-24 bg-gray-50">
-        <div className="w-full max-w-2xl bg-white rounded-xl shadow-md p-6 border border-gray-200">
-          <div className="flex justify-between items-center border-b pb-4 mb-6">
-            <div>
-              <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-                ステージ 1
-              </span>
-              <h2 className="text-2xl font-bold text-gray-800 mt-1">
-                課長承認：はじめてのお辞儀ハンコ
-              </h2>
-            </div>
-            <button
-              onClick={handleBackToTop}
-              className="text-gray-500 hover:text-gray-700 text-sm font-medium"
-            >
-              戻る
-            </button>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-amber-900 mb-1">
-              ミッション
-            </h3>
-            <p className="text-sm text-amber-800">
-              稟議書（パソコン購入申請）に捺印しなさい。
-              ただし、日本企業の伝統マナーに基づき、
-              <strong>上司（課長）に向かってお辞儀をするように、左に少し傾けて（お辞儀ハンコ）</strong>
-              捺印すること。
-            </p>
-          </div>
-
-          {/* 稟議書風のプレビュー領域 */}
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-white mb-6 relative overflow-hidden min-h-[250px] flex flex-col justify-between">
-            <div className="text-center">
-              <h3 className="text-xl font-bold border-b-2 border-double border-gray-800 pb-2 inline-block text-gray-800">
-                パソコン購入稟議書
-              </h3>
-            </div>
-
-            <div className="my-6 text-sm text-gray-700 space-y-2">
-              <p>
-                <strong>件名：</strong> 開発用ハイスペックPCの新規調達
-              </p>
-              <p>
-                <strong>理由：</strong> 現行のPCスペック不足により、ビルドおよびデバッグに著しい支障が出ているため。
-              </p>
-            </div>
-
-            {/* 捺印欄 */}
-            <div className="flex justify-end mt-4">
-              <div className="flex border border-gray-800 text-center">
-                <div className="w-20 border-r border-gray-800">
-                  <div className="bg-gray-100 text-xs py-1 border-b border-gray-800 text-gray-800">
-                    部長
-                  </div>
-                  <div className="h-16 flex items-center justify-center text-gray-300 text-xs select-none">
-                    （未承認）
-                  </div>
-                </div>
-                <div className="w-20 border-r border-gray-800 bg-red-50/10 relative">
-                  <div className="bg-gray-100 text-xs py-1 border-b border-gray-800 text-gray-800">
-                    課長
-                  </div>
-                  <div className="h-16 flex items-center justify-center">
-                    {/* 捺印される印影 */}
-                    <div
-                      style={{
-                        transform: `rotate(${angle}deg)`,
-                        transition: judged ? 'transform 0.5s ease' : 'none',
-                      }}
-                      className={`w-12 h-12 rounded-full border-2 border-red-500 flex items-center justify-center text-red-500 font-bold select-none ${
-                        judged ? 'opacity-100' : 'opacity-40 animate-pulse'
-                      }`}
-                    >
-                      <span className="text-sm tracking-widest leading-none block transform scale-90">
-                        鈴木
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-20">
-                  <div className="bg-gray-100 text-xs py-1 border-b border-gray-800 text-gray-800">
-                    起案者
-                  </div>
-                  <div className="h-16 flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full border-2 border-red-400 flex items-center justify-center text-red-400 font-semibold text-xs select-none">
-                      鈴木
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 判定結果の表示 */}
-          {judged && (
-            <div
-              className={`p-4 rounded-lg mb-6 border ${
-                isPassed
-                  ? 'bg-green-50 border-green-200 text-green-900'
-                  : 'bg-red-50 border-red-200 text-red-900'
-              }`}
-            >
-              <h4 className="font-bold mb-1">
-                {isPassed ? '🎉 合格！' : '❌ 差し戻し！'}
-              </h4>
-              <p className="text-sm leading-relaxed">{resultMessage}</p>
-            </div>
-          )}
-
-          {/* コントロールパネル */}
-          {!judged ? (
-            <div className="space-y-4">
+      <main className="d-flex min-vh-100 flex-column align-items-center justify-content-center p-4 p-md-5 bg-light">
+        <div className="card w-100 shadow-sm" style={{ maxWidth: '42rem' }}>
+          <div className="card-body p-4">
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
               <div>
-                <label className="flex justify-between text-sm font-medium text-gray-700 mb-1">
-                  <span>お辞儀角度の調整: {angle}度</span>
-                  <span className="text-xs text-gray-500">
-                    ※左へ傾けるほどマイナス
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min="-90"
-                  max="90"
-                  value={angle}
-                  onChange={(e) => {
-                    const newAngle = Number(e.target.value);
-                    setAngle(newAngle);
-                    updateUrl(isStarted, newAngle, judged);
-                  }}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-600"
-                />
-                <div className="flex justify-between text-xs text-gray-600 px-1 mt-1">
-                  <span>← 左に深くお辞儀 (-90度)</span>
-                  <span>真っ直ぐ (0度)</span>
-                  <span>右にのけぞる (+90度) →</span>
-                </div>
+                <span className="badge bg-danger-subtle text-danger-emphasis">
+                  ステージ 1
+                </span>
+                <h2 className="fs-4 fw-bold mt-1">
+                  課長承認：はじめてのお辞儀ハンコ
+                </h2>
+              </div>
+              <button
+                onClick={handleBackToTop}
+                className="btn btn-link btn-sm text-secondary text-decoration-none p-0"
+              >
+                戻る
+              </button>
+            </div>
+
+            <div className="alert alert-warning mb-4">
+              <h3 className="alert-heading fs-6 fw-semibold mb-1">
+                ミッション
+              </h3>
+              <p className="small mb-0">
+                稟議書（パソコン購入申請）に捺印しなさい。
+                ただし、日本企業の伝統マナーに基づき、
+                <strong>上司（課長）に向かってお辞儀をするように、左に少し傾けて（お辞儀ハンコ）</strong>
+                捺印すること。
+              </p>
+            </div>
+
+            {/* 稟議書風のプレビュー領域 */}
+            <div className="doc-preview p-4 p-md-5 bg-white mb-4 position-relative overflow-hidden d-flex flex-column justify-content-between">
+              <div className="text-center">
+                <h3 className="fs-4 fw-bold border-bottom border-2 pb-2 d-inline-block">
+                  パソコン購入稟議書
+                </h3>
               </div>
 
-              <button
-                onClick={handleJudge}
-                className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-sm"
-              >
-                これで捺印を申請する
-              </button>
+              <div className="my-4 small text-secondary">
+                <p>
+                  <strong>件名：</strong> 開発用ハイスペックPCの新規調達
+                </p>
+                <p>
+                  <strong>理由：</strong> 現行のPCスペック不足により、ビルドおよびデバッグに著しい支障が出ているため。
+                </p>
+              </div>
+
+              {/* 捺印欄 */}
+              <div className="d-flex justify-content-end mt-3">
+                <div className="d-flex border border-dark text-center">
+                  <div className="border-end border-dark" style={{ width: '5rem' }}>
+                    <div className="bg-body-secondary small py-1 border-bottom border-dark">
+                      部長
+                    </div>
+                    <div
+                      className="d-flex align-items-center justify-content-center text-body-tertiary small user-select-none"
+                      style={{ height: '4rem' }}
+                    >
+                      （未承認）
+                    </div>
+                  </div>
+                  <div className="border-end border-dark position-relative" style={{ width: '5rem' }}>
+                    <div className="bg-body-secondary small py-1 border-bottom border-dark">
+                      課長
+                    </div>
+                    <div
+                      className="d-flex align-items-center justify-content-center"
+                      style={{ height: '4rem' }}
+                    >
+                      {/* 捺印される印影 */}
+                      <div
+                        style={{
+                          transform: `rotate(${angle}deg)`,
+                          transition: judged ? 'transform 0.5s ease' : 'none',
+                          width: '3rem',
+                          height: '3rem',
+                        }}
+                        className={`rounded-circle border border-2 border-danger d-flex align-items-center justify-content-center text-danger fw-bold user-select-none ${
+                          judged ? 'opacity-100' : 'opacity-50'
+                        }`}
+                      >
+                        <span className="small d-block" style={{ letterSpacing: '0.2em', lineHeight: 1 }}>
+                          鈴木
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ width: '5rem' }}>
+                    <div className="bg-body-secondary small py-1 border-bottom border-dark">
+                      起案者
+                    </div>
+                    <div
+                      className="d-flex align-items-center justify-content-center"
+                      style={{ height: '4rem' }}
+                    >
+                      <div
+                        className="rounded-circle border border-2 border-danger d-flex align-items-center justify-content-center text-danger small fw-semibold user-select-none"
+                        style={{ width: '3rem', height: '3rem' }}
+                      >
+                        鈴木
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="flex gap-4">
-              <button
-                onClick={handleReset}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors border border-gray-300"
-              >
-                もう一度調整する
-              </button>
-              {isPassed && (
+
+            {/* 判定結果の表示 */}
+            {judged && (
+              <div className={`alert ${isPassed ? 'alert-success' : 'alert-danger'} mb-4`}>
+                <h4 className="alert-heading fs-6 fw-bold mb-1">
+                  {isPassed ? '🎉 合格！' : '❌ 差し戻し！'}
+                </h4>
+                <p className="small mb-0">{resultMessage}</p>
+              </div>
+            )}
+
+            {/* コントロールパネル */}
+            {!judged ? (
+              <div className="d-flex flex-column gap-3">
+                <div>
+                  <label className="d-flex justify-content-between small fw-semibold mb-1">
+                    <span>お辞儀角度の調整: {angle}度</span>
+                    <span className="small text-secondary">
+                      ※左へ傾けるほどマイナス
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="-90"
+                    max="90"
+                    value={angle}
+                    onChange={(e) => {
+                      const newAngle = Number(e.target.value);
+                      setAngle(newAngle);
+                      updateUrl(isStarted, newAngle, judged);
+                    }}
+                    className="form-range"
+                    style={{ accentColor: 'var(--bs-danger)' }}
+                  />
+                  <div className="d-flex justify-content-between small text-secondary px-1 mt-1">
+                    <span>← 左に深くお辞儀 (-90度)</span>
+                    <span>真っ直ぐ (0度)</span>
+                    <span>右にのけぞる (+90度) →</span>
+                  </div>
+                </div>
+
                 <button
-                  onClick={handleBackToTop}
-                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors shadow-sm"
+                  onClick={handleJudge}
+                  className="btn btn-danger w-100 py-2 fw-bold shadow-sm"
                 >
-                  メイン画面へ戻る
+                  これで捺印を申請する
                 </button>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="d-flex gap-3">
+                <button
+                  onClick={handleReset}
+                  className="btn btn-outline-secondary flex-fill py-2 fw-bold"
+                >
+                  もう一度調整する
+                </button>
+                {isPassed && (
+                  <button
+                    onClick={handleBackToTop}
+                    className="btn btn-success flex-fill py-2 fw-bold shadow-sm"
+                  >
+                    メイン画面へ戻る
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     );
