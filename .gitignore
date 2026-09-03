@@ -38,3 +38,7 @@ commit_msg*.txt
 # Next.js
 .next/
 next-env.d.ts
+
+# semantic-release（enable_shared_release_config: trueによりCI実行時にdev-standardsから
+# コピーされる一時ファイル。コミット対象外）
+release-config.cjs
