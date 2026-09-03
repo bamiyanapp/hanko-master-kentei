@@ -7,12 +7,23 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
   pages: write
   id-token: write
 
 jobs:
+  release:
+    name: Release
+    uses: bamiyanapp/dev-standards/.github/workflows/reusable-cd.yml@v2.7.3
+    with:
+      enable_release: true
+      enable_shared_release_config: true
+    secrets:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+
   build-and-deploy-frontend:
+    needs: release
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -21,10 +32,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: main
           submodules: true
       - name: 🏷️ ビルド情報を環境変数へ設定
         run: |
-          echo "NEXT_PUBLIC_APP_VERSION=$(node -p "require('./frontend/package.json').version")" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_APP_BUILD_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_APP_BUILD_TIME=$(date -u +'%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
       - name: 🚀 Build and deploy to GitHub Pages
@@ -40,10 +52,13 @@ jobs:
           echo "Pages URL: ${{ steps.deployment.outputs.page-url }}"
 
   deploy-backend:
+    needs: release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: main
       - name: 🚀 Deploy Backend (OSLS)
         uses: bamiyanapp/dev-standards/.github/actions/deploy-serverless@v2.7.3
         with:
