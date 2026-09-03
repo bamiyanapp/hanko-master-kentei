@@ -293,9 +293,23 @@ export default function Home() {
         >
           検定を開始する
         </button>
+        <p className="mt-4 mb-0 text-secondary" style={{ fontSize: '0.75rem' }}>
+          {formatBuildInfo()}
+        </p>
       </div>
     </main>
   );
+}
+
+// デプロイ済みビルドのバージョン・更新日時をトップ画面に表示する（issue #248）。
+// CD実行時（cd.ymlの「ビルド情報を環境変数へ設定」ステップ）にのみ
+// NEXT_PUBLIC_APP_*が設定されるため、ローカル開発時は未設定フォールバックになる。
+function formatBuildInfo(): string {
+  const version = process.env.NEXT_PUBLIC_APP_VERSION;
+  const sha = process.env.NEXT_PUBLIC_APP_BUILD_SHA;
+  const time = process.env.NEXT_PUBLIC_APP_BUILD_TIME;
+  if (!version && !sha && !time) return '開発版';
+  return [version && `v${version}`, sha, time].filter(Boolean).join(' / ');
 }
 
 export function judgeHankoAngle(angle: number): { isPassed: boolean; message: string } {

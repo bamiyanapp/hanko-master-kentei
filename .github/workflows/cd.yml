@@ -22,6 +22,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           submodules: true
+      - name: 🏷️ ビルド情報を環境変数へ設定
+        run: |
+          echo "NEXT_PUBLIC_APP_VERSION=$(node -p "require('./frontend/package.json').version")" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_APP_BUILD_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_APP_BUILD_TIME=$(date -u +'%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
       - name: 🚀 Build and deploy to GitHub Pages
         id: deployment
         uses: bamiyanapp/dev-standards/.github/actions/deploy-github-pages@v2.7.3
