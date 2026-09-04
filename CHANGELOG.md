@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.0.1...v1.0.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* **cd:** dev-standards参照をv2.7.5へ更新しreleaseジョブを正常化する ([#265](https://github.com/bamiyanapp/hanko-master-kentei/issues/265)) ([53404a5](https://github.com/bamiyanapp/hanko-master-kentei/commit/53404a53b82907cdf6832edf95dc6b3367e0ca72)), closes [#261](https://github.com/bamiyanapp/hanko-master-kentei/issues/261)
+
 ## [1.0.1](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.0.0...v1.0.1) (2026-09-03)
 
 
