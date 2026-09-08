@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.3.0...v1.4.0) (2026-09-08)
+
+
+### Features
+
+* **minigame:** 捺印ミニゲーム「長押し捺印（印影濃度）」を実装する ([#280](https://github.com/bamiyanapp/hanko-master-kentei/issues/280)) ([9f152bc](https://github.com/bamiyanapp/hanko-master-kentei/commit/9f152bce359836bbaaa6b7f678b5876a7dade561))
+
 # [1.3.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.2.0...v1.3.0) (2026-09-08)
 
 
