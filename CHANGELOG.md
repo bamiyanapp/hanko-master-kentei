@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.4.0...v1.5.0) (2026-09-08)
+
+
+### Features
+
+* **minigame:** 捺印ミニゲーム「位置合わせ（ドラッグ&ドロップ）」を実装する ([#281](https://github.com/bamiyanapp/hanko-master-kentei/issues/281)) ([7d43766](https://github.com/bamiyanapp/hanko-master-kentei/commit/7d43766852eb2da5540950853bf54af2d20b2397))
+
 # [1.4.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.3.0...v1.4.0) (2026-09-08)
 
 
