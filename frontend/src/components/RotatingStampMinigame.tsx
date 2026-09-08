@@ -33,8 +33,15 @@ export default function RotatingStampMinigame({ rule, onComplete }: RotatingStam
 
   const handleStop = () => {
     setStopped(true);
-    const score = scoreByTargetTolerance(rule, angle);
-    onComplete({ actual: angle, score });
+    // 表示・アニメーション用の`angle`は0〜354の範囲で単調増加させ続けるが
+    // （スムーズな連続回転のため）、採点はお辞儀角度等の符号付きルール
+    // （例: 左傾きを負の角度とする`target: -22.5`）と一致するよう、
+    // -180〜180の範囲へ正規化した値で行う（issue #194で発覚: 正規化前は
+    // angleが常に0以上のため、負のtargetを持つルールが理論上クリア不可能
+    // だった）。
+    const normalizedAngle = angle > 180 ? angle - 360 : angle;
+    const score = scoreByTargetTolerance(rule, normalizedAngle);
+    onComplete({ actual: normalizedAngle, score });
   };
 
   return (
