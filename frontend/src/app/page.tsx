@@ -4,25 +4,39 @@ import React, { useState } from 'react';
 
 import { useEffect } from 'react';
 import { playClickSound, playSuccessSound, playFailureSound } from './sfx';
+import { scenarios } from '@/data/scenarios';
+import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
+
+type Screen = 'top' | 'selection' | 'game';
+
+// 現在ランク・認定スコア・案件クリア状況は、判定エンジン（#198）・昇格ランク
+// システム（#199）・結果画面（#200）で実装される永続化の仕組みに依存するため、
+// MVPのトップ画面・案件選択画面（#193）では固定値のプレースホルダーとする。
+const RANK_NAMES = ['見習い', '初級', '中級', '上級', '師範', 'ハンコマスター'];
+const CURRENT_RANK = 0;
+const CERTIFICATION_SCORE = 0;
+const CLEARED_SCENARIO_IDS: string[] = [];
 
 export default function Home() {
-  const [isStarted, setIsStarted] = useState(false);
+  const [screen, setScreen] = useState<Screen>('top');
   const [angle, setAngle] = useState(0); // 角度（度数法：-180 〜 180）
   const [judged, setJudged] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const [isPassed, setIsPassed] = useState(false);
 
   // URLパラメータと状態の同期用関数
-  const updateUrl = (started: boolean, currentAngle: number, currentJudged: boolean) => {
+  const updateUrl = (currentScreen: Screen, currentAngle: number, currentJudged: boolean) => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams();
-    if (started) {
-      params.set('started', 'true');
-      if (currentAngle !== 0) {
-        params.set('angle', currentAngle.toString());
-      }
-      if (currentJudged) {
-        params.set('judged', 'true');
+    if (currentScreen !== 'top') {
+      params.set('screen', currentScreen);
+      if (currentScreen === 'game') {
+        if (currentAngle !== 0) {
+          params.set('angle', currentAngle.toString());
+        }
+        if (currentJudged) {
+          params.set('judged', 'true');
+        }
       }
     }
     const newSearch = params.toString();
@@ -35,13 +49,13 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    
-    const startedParam = params.get('started') === 'true';
+
+    const screenParam = params.get('screen');
     const angleParam = Number(params.get('angle') || 0);
     const judgedParam = params.get('judged') === 'true';
-    
-    if (startedParam) {
-      setIsStarted(true);
+
+    if (screenParam === 'selection' || screenParam === 'game') {
+      setScreen(screenParam);
     }
     if (angleParam !== 0) {
       setAngle(angleParam);
@@ -54,14 +68,23 @@ export default function Home() {
     }
   }, []);
 
-  const handleStart = () => {
+  const handleGoToSelection = () => {
     playClickSound();
-    setIsStarted(true);
+    setScreen('selection');
+    updateUrl('selection', 0, false);
+  };
+
+  const handleSelectScenario = () => {
+    // MVPでは案件を1件のみサンプル実装しているため、選択された案件に関わらず
+    // 既存のゲーム画面（お辞儀ハンコ）へ遷移する。案件ごとのステージ進行は
+    // #194で実装する。
+    playClickSound();
+    setScreen('game');
     setAngle(0);
     setJudged(false);
     setResultMessage('');
     setIsPassed(false);
-    updateUrl(true, 0, false);
+    updateUrl('game', 0, false);
   };
 
   const handleJudge = () => {
@@ -69,7 +92,7 @@ export default function Home() {
     const result = judgeHankoAngle(angle);
     setIsPassed(result.isPassed);
     setResultMessage(result.message);
-    updateUrl(isStarted, angle, true);
+    updateUrl('game', angle, true);
     if (result.isPassed) {
       playSuccessSound();
     } else {
@@ -83,16 +106,28 @@ export default function Home() {
     setJudged(false);
     setResultMessage('');
     setIsPassed(false);
-    updateUrl(isStarted, 0, false);
+    updateUrl('game', 0, false);
   };
 
   const handleBackToTop = () => {
     playClickSound();
-    setIsStarted(false);
-    updateUrl(false, 0, false);
+    setScreen('top');
+    updateUrl('top', 0, false);
   };
 
-  if (isStarted) {
+  if (screen === 'selection') {
+    return (
+      <ScenarioSelectionScreen
+        scenarios={scenarios}
+        currentRank={CURRENT_RANK}
+        clearedScenarioIds={CLEARED_SCENARIO_IDS}
+        onSelect={handleSelectScenario}
+        onBack={handleBackToTop}
+      />
+    );
+  }
+
+  if (screen === 'game') {
     return (
       <main className="d-flex min-vh-100 flex-column align-items-center justify-content-center p-4 p-md-5 bg-light">
         <div className="card w-100 shadow-sm" style={{ maxWidth: '42rem' }}>
@@ -107,7 +142,7 @@ export default function Home() {
                 </h2>
               </div>
               <button
-                onClick={handleBackToTop}
+                onClick={handleGoToSelection}
                 className="btn btn-link btn-sm text-secondary text-decoration-none p-0"
               >
                 戻る
@@ -231,7 +266,7 @@ export default function Home() {
                     onChange={(e) => {
                       const newAngle = Number(e.target.value);
                       setAngle(newAngle);
-                      updateUrl(isStarted, newAngle, judged);
+                      updateUrl('game', newAngle, judged);
                     }}
                     className="form-range"
                     style={{ accentColor: 'var(--bs-danger)' }}
@@ -260,10 +295,10 @@ export default function Home() {
                 </button>
                 {isPassed && (
                   <button
-                    onClick={handleBackToTop}
+                    onClick={handleGoToSelection}
                     className="btn btn-success flex-fill py-2 fw-bold shadow-sm"
                   >
-                    メイン画面へ戻る
+                    案件選択へ戻る
                   </button>
                 )}
               </div>
@@ -287,12 +322,31 @@ export default function Home() {
           誠意ある捺印こそが、社会人の基本です。
           あなたの「捺印マナー力」を今こそ証明しましょう。
         </p>
-        <button
-          onClick={handleStart}
-          className="btn btn-danger btn-lg mt-5 px-4 py-3 fw-bold shadow"
-        >
-          検定を開始する
-        </button>
+
+        <div className="d-flex justify-content-center gap-4 mt-4 small text-secondary">
+          <span>
+            現在の階級: <strong className="text-body">{RANK_NAMES[CURRENT_RANK]}</strong>
+          </span>
+          <span>
+            認定スコア: <strong className="text-body">{CERTIFICATION_SCORE}点</strong>
+          </span>
+        </div>
+
+        <div className="d-flex flex-column gap-2 mx-auto mt-5" style={{ maxWidth: '20rem' }}>
+          <button
+            onClick={handleGoToSelection}
+            className="btn btn-danger btn-lg px-4 py-3 fw-bold shadow"
+          >
+            検定を受ける
+          </button>
+          <button className="btn btn-outline-secondary" disabled>
+            実績（Coming soon）
+          </button>
+          <button className="btn btn-outline-secondary" disabled>
+            ランキング（Coming soon）
+          </button>
+        </div>
+
         <p className="mt-4 mb-0 text-secondary" style={{ fontSize: '0.75rem' }}>
           {formatBuildInfo()}
         </p>
