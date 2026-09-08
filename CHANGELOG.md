@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.5.0...v1.6.0) (2026-09-08)
+
+
+### Features
+
+* **judgement:** 判定エンジン・スコアリング（格式/礼節/誠意/精密性）を実装する ([#282](https://github.com/bamiyanapp/hanko-master-kentei/issues/282)) ([7c7f7b9](https://github.com/bamiyanapp/hanko-master-kentei/commit/7c7f7b9e82b1d8f7d621e5305b52a5bc77119a6d))
+
 # [1.5.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.4.0...v1.5.0) (2026-09-08)
 
 
