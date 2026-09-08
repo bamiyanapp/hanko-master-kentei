@@ -24,6 +24,10 @@ export default function Home() {
   // （見習い・0点・未クリア）を表示し、マウント後のuseEffectで実際の保存内容へ
   // 差し替える（ブラウザAPIに依存するため、既存のURL復元と同じパターン）。
   const [progress, setProgress] = useState<Progress>(INITIAL_PROGRESS);
+  // 案件クリアの結果として実際に昇格した場合のみ非nullとなり、結果画面
+  // （#200）で昇格演出を表示する。昇格していなければnullのまま
+  // （issue #200「合格時は次ステージ・次案件、または昇格判定へ進む」に対応）。
+  const [rankUpTo, setRankUpTo] = useState<number | null>(null);
 
   // URLパラメータと状態の同期用関数。ApplicationStageFlow内部のステージ・
   // ルール進行状況はコンポーネント自身が状態を持つ設計（#194）のため、
@@ -72,6 +76,7 @@ export default function Home() {
     setScreen('selection');
     setSelectedScenario(null);
     setScenarioResult(null);
+    setRankUpTo(null);
     updateUrl('selection', null);
   };
 
@@ -97,7 +102,10 @@ export default function Home() {
     if (result.passed) {
       playSuccessSound();
       if (selectedScenario) {
-        setProgress(recordScenarioClear(selectedScenario.id, result));
+        const previousRankIndex = progress.rankIndex;
+        const updatedProgress = recordScenarioClear(selectedScenario.id, result);
+        setProgress(updatedProgress);
+        setRankUpTo(updatedProgress.rankIndex > previousRankIndex ? updatedProgress.rankIndex : null);
       }
     } else {
       playFailureSound();
@@ -109,6 +117,7 @@ export default function Home() {
     setScreen('top');
     setSelectedScenario(null);
     setScenarioResult(null);
+    setRankUpTo(null);
     updateUrl('top', null);
   };
 
@@ -147,6 +156,15 @@ export default function Home() {
         <div className="card w-100 shadow-sm" style={{ maxWidth: '42rem' }}>
           <div className="card-body p-4">
             <h2 className="fs-4 fw-bold mb-3">{selectedScenario.title}：案件クリア</h2>
+
+            {rankUpTo !== null && (
+              <div className="alert alert-warning mb-4">
+                <h3 className="alert-heading fs-6 fw-bold mb-0">
+                  🎊 昇格！ 「{RANK_NAMES[rankUpTo]}」に認定されました
+                </h3>
+              </div>
+            )}
+
             <div className={`alert ${scenarioResult.passed ? 'alert-success' : 'alert-danger'} mb-4`}>
               <h3 className="alert-heading fs-6 fw-bold mb-1">
                 {scenarioResult.passed ? '🎉 承認されました！' : '❌ 差し戻されました'}（総合スコア
