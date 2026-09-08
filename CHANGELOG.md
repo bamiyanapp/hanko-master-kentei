@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.2.0...v1.3.0) (2026-09-08)
+
+
+### Features
+
+* **minigame:** 捺印ミニゲーム「回転印」を正式なコンポーネントへ再構成する ([#279](https://github.com/bamiyanapp/hanko-master-kentei/issues/279)) ([7105650](https://github.com/bamiyanapp/hanko-master-kentei/commit/7105650bf216d9da66b15796c5de17c37840f8d5))
+
 # [1.2.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.1.0...v1.2.0) (2026-09-08)
 
 
