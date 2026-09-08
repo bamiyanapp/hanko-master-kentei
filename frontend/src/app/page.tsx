@@ -4,45 +4,37 @@ import React, { useState } from 'react';
 
 import { useEffect } from 'react';
 import { playClickSound, playSuccessSound, playFailureSound } from './sfx';
-import { scenarios, pcPurchaseScenario } from '@/data/scenarios';
+import { scenarios, getScenarioById } from '@/data/scenarios';
+import type { Scenario } from '@/types/scenario';
 import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
-import RotatingStampMinigame, {
-  type RotatingStampResult,
-} from '@/components/RotatingStampMinigame';
-import type { MinigameScore } from '@/lib/scoring';
-import type { Rule } from '@/types/scenario';
+import ApplicationStageFlow from '@/components/ApplicationStageFlow';
+import { METRIC_NAMES, type JudgementResult } from '@/lib/judgement';
 
-type Screen = 'top' | 'selection' | 'game';
+type Screen = 'top' | 'selection' | 'game' | 'result';
 
-// 現在ランク・認定スコア・案件クリア状況は、判定エンジン（#198）・昇格ランク
-// システム（#199）・結果画面（#200）で実装される永続化の仕組みに依存するため、
-// MVPのトップ画面・案件選択画面（#193）では固定値のプレースホルダーとする。
+// 現在ランク・認定スコア・案件クリア状況は、昇格ランクシステム（#199）で
+// 実装される永続化の仕組みに依存するため、MVPのトップ画面・案件選択画面
+// （#193）では固定値のプレースホルダーとする。
 const RANK_NAMES = ['見習い', '初級', '中級', '上級', '師範', 'ハンコマスター'];
 const CURRENT_RANK = 0;
 const CERTIFICATION_SCORE = 0;
 const CLEARED_SCENARIO_IDS: string[] = [];
 
-// MVPでは案件を1件のみサンプル実装しているため、案件選択に関わらず起票ステージの
-// 単一ルールで固定のデモとする。案件ごとの複数ステージ進行は#194で実装する。
-const DEMO_STAGE = pcPurchaseScenario.stages[0];
-const DEMO_RULE = DEMO_STAGE.rules[0];
-
-const isValidScore = (value: string | null): value is MinigameScore =>
-  value === 'excellent' || value === 'good' || value === 'fail';
-
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('top');
-  const [minigameResult, setMinigameResult] = useState<RotatingStampResult | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
+  const [scenarioResult, setScenarioResult] = useState<JudgementResult | null>(null);
 
-  // URLパラメータと状態の同期用関数
-  const updateUrl = (currentScreen: Screen, result: RotatingStampResult | null) => {
+  // URLパラメータと状態の同期用関数。ApplicationStageFlow内部のステージ・
+  // ルール進行状況はコンポーネント自身が状態を持つ設計（#194）のため、
+  // ここでは画面単位・選択中の案件idまでを同期対象とする。
+  const updateUrl = (currentScreen: Screen, scenarioId: string | null) => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams();
     if (currentScreen !== 'top') {
       params.set('screen', currentScreen);
-      if (currentScreen === 'game' && result) {
-        params.set('actual', result.actual.toString());
-        params.set('score', result.score);
+      if (scenarioId) {
+        params.set('scenario', scenarioId);
       }
     }
     const newSearch = params.toString();
@@ -57,49 +49,58 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
 
     const screenParam = params.get('screen');
-    const actualParam = params.get('actual');
-    const scoreParam = params.get('score');
+    const scenarioIdParam = params.get('scenario');
 
-    if (screenParam === 'selection' || screenParam === 'game') {
-      setScreen(screenParam);
-    }
-    if (actualParam !== null && isValidScore(scoreParam)) {
-      setMinigameResult({ actual: Number(actualParam), score: scoreParam });
+    if (screenParam === 'selection') {
+      setScreen('selection');
+    } else if (screenParam === 'game' && scenarioIdParam) {
+      const scenario = getScenarioById(scenarioIdParam);
+      if (scenario) {
+        setSelectedScenario(scenario);
+        setScreen('game');
+      }
     }
   }, []);
 
   const handleGoToSelection = () => {
     playClickSound();
     setScreen('selection');
+    setSelectedScenario(null);
+    setScenarioResult(null);
     updateUrl('selection', null);
   };
 
-  const handleSelectScenario = () => {
+  const handleStartExam = () => {
     playClickSound();
+    setScreen('selection');
+    updateUrl('selection', null);
+  };
+
+  const handleSelectScenario = (scenarioId: string) => {
+    const scenario = getScenarioById(scenarioId);
+    if (!scenario) return;
+    playClickSound();
+    setSelectedScenario(scenario);
     setScreen('game');
-    setMinigameResult(null);
-    updateUrl('game', null);
+    updateUrl('game', scenarioId);
   };
 
-  const handleMinigameComplete = (result: RotatingStampResult) => {
-    setMinigameResult(result);
-    updateUrl('game', result);
-    if (result.score === 'fail') {
-      playFailureSound();
-    } else {
+  const handleScenarioComplete = (result: JudgementResult) => {
+    setScenarioResult(result);
+    setScreen('result');
+    updateUrl('result', selectedScenario?.id ?? null);
+    if (result.passed) {
       playSuccessSound();
+    } else {
+      playFailureSound();
     }
-  };
-
-  const handleRetry = () => {
-    playClickSound();
-    setMinigameResult(null);
-    updateUrl('game', null);
   };
 
   const handleBackToTop = () => {
     playClickSound();
     setScreen('top');
+    setSelectedScenario(null);
+    setScenarioResult(null);
     updateUrl('top', null);
   };
 
@@ -115,66 +116,56 @@ export default function Home() {
     );
   }
 
-  if (screen === 'game') {
+  if (screen === 'game' && selectedScenario) {
     return (
       <main className="d-flex min-vh-100 flex-column align-items-center justify-content-center p-4 p-md-5 bg-light">
         <div className="card w-100 shadow-sm" style={{ maxWidth: '42rem' }}>
           <div className="card-body p-4">
-            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
-              <div>
-                <span className="badge bg-danger-subtle text-danger-emphasis">
-                  ステージ 1（起票）
-                </span>
-                <h2 className="fs-4 fw-bold mt-1">{pcPurchaseScenario.title}</h2>
-              </div>
-              <button
-                onClick={handleGoToSelection}
-                className="btn btn-link btn-sm text-secondary text-decoration-none p-0"
-              >
-                戻る
-              </button>
-            </div>
+            <h2 className="fs-4 fw-bold mb-3">{selectedScenario.title}</h2>
+            <ApplicationStageFlow
+              scenario={selectedScenario}
+              onComplete={handleScenarioComplete}
+              onBack={handleGoToSelection}
+            />
+          </div>
+        </div>
+      </main>
+    );
+  }
 
-            <div className="alert alert-warning mb-4">
-              <h3 className="alert-heading fs-6 fw-semibold mb-1">
-                ミッション
+  if (screen === 'result' && scenarioResult && selectedScenario) {
+    return (
+      <main className="d-flex min-vh-100 flex-column align-items-center justify-content-center p-4 p-md-5 bg-light">
+        <div className="card w-100 shadow-sm" style={{ maxWidth: '42rem' }}>
+          <div className="card-body p-4">
+            <h2 className="fs-4 fw-bold mb-3">{selectedScenario.title}：案件クリア</h2>
+            <div className={`alert ${scenarioResult.passed ? 'alert-success' : 'alert-danger'} mb-4`}>
+              <h3 className="alert-heading fs-6 fw-bold mb-1">
+                {scenarioResult.passed ? '🎉 承認されました！' : '❌ 差し戻されました'}（総合スコア
+                {scenarioResult.overallScore}点）
               </h3>
-              <p className="small mb-0">{pcPurchaseScenario.description}</p>
+              <p className="small mb-0">{scenarioResult.comment}</p>
             </div>
 
-            {/* 判定結果の表示 */}
-            {minigameResult && (
-              <div
-                className={`alert ${minigameResult.score !== 'fail' ? 'alert-success' : 'alert-danger'} mb-4`}
-              >
-                <h4 className="alert-heading fs-6 fw-bold mb-1">
-                  {formatResultHeading(minigameResult.score)}
-                </h4>
-                <p className="small mb-0">{getFlavorMessage(minigameResult, DEMO_RULE)}</p>
-              </div>
-            )}
+            <div className="row row-cols-2 g-3 mb-4">
+              {METRIC_NAMES.map((metric) => (
+                <div key={metric} className="col">
+                  <div className="border rounded p-2 text-center">
+                    <div className="small text-secondary">{metric}</div>
+                    <div className="fs-5 fw-bold">
+                      {scenarioResult.metricScores[metric] ?? '－'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-            {/* コントロールパネル */}
-            {!minigameResult ? (
-              <RotatingStampMinigame rule={DEMO_RULE} onComplete={handleMinigameComplete} />
-            ) : (
-              <div className="d-flex gap-3">
-                <button
-                  onClick={handleRetry}
-                  className="btn btn-outline-secondary flex-fill py-2 fw-bold"
-                >
-                  もう一度調整する
-                </button>
-                {minigameResult.score !== 'fail' && (
-                  <button
-                    onClick={handleGoToSelection}
-                    className="btn btn-success flex-fill py-2 fw-bold shadow-sm"
-                  >
-                    案件選択へ戻る
-                  </button>
-                )}
-              </div>
-            )}
+            <button
+              onClick={handleGoToSelection}
+              className="btn btn-success w-100 py-2 fw-bold shadow-sm"
+            >
+              案件選択へ戻る
+            </button>
           </div>
         </div>
       </main>
@@ -206,7 +197,7 @@ export default function Home() {
 
         <div className="d-flex flex-column gap-2 mx-auto mt-5" style={{ maxWidth: '20rem' }}>
           <button
-            onClick={handleGoToSelection}
+            onClick={handleStartExam}
             className="btn btn-danger btn-lg px-4 py-3 fw-bold shadow"
           >
             検定を受ける
@@ -236,28 +227,4 @@ function formatBuildInfo(): string {
   const time = process.env.NEXT_PUBLIC_APP_BUILD_TIME;
   if (!version && !sha && !time) return '開発版';
   return [version && `v${version}`, sha, time].filter(Boolean).join(' / ');
-}
-
-export function formatResultHeading(score: MinigameScore): string {
-  if (score === 'excellent') return '🎉 合格（Excellent）！';
-  if (score === 'good') return '🎉 合格（Good）';
-  return '❌ 差し戻し！';
-}
-
-// 課長の評（issue #191の風刺トーンを、汎用スコア（excellent/good/fail）に
-// マッピングする形で維持する）。案件・ルールごとの本格的な文言整備は
-// #202「初期案件コンテンツ整備」で行う想定のため、ここでは最小限のバリエーションに
-// とどめる。
-export function getFlavorMessage(result: RotatingStampResult, rule: Rule): string {
-  if (result.score === 'excellent') {
-    return '課長「うむ、実に見事な捺印だ！上司への敬意が痛いほど伝わってくる。これぞ一流の社会人だな！」';
-  }
-  if (result.score === 'good') {
-    return '課長「まあ、及第点というやつだな。もう少し研ぎ澄ませば一流に近づくだろう。」';
-  }
-  const target = rule.target ?? 0;
-  if (result.actual > target) {
-    return '課長「バカ者！上司への敬意が感じられんぞ！あまりに不誠実だ、すぐに押し直したまえ！」';
-  }
-  return '課長「いくら何でもやりすぎだ。ほどほどにしたまえ。」';
 }

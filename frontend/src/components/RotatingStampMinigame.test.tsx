@@ -100,7 +100,31 @@ describe('RotatingStampMinigame', () => {
     const [stopButton] = findAllButtons(result);
     stopButton.props.onClick();
 
-    expect(onComplete).toHaveBeenCalledWith({ actual: 200, score: 'fail' });
+    // 200度は-180〜180への正規化で200-360=-160として採点される
+    expect(onComplete).toHaveBeenCalledWith({ actual: -160, score: 'fail' });
+  });
+
+  it('180度を超える角度は-180〜180の範囲へ正規化してから採点する（負のtargetを持つルール対応）', () => {
+    // お辞儀ハンコ等、左傾き（負の角度）を要求するルールの例
+    const bowRule: Rule = {
+      id: 'bow-angle',
+      description: 'お辞儀角度ルール',
+      type: 'angle',
+      difficulty: 1,
+      target: -22.5,
+      tolerance: 12.5,
+    };
+    // 内部の生角度337.5（0〜354・6度刻みでは336または342が相当）は
+    // 正規化すると337.5-360=-22.5で目標ちょうどになる
+    stateValues = [337.5, false];
+    useStateCallCount = 0;
+    const onComplete = vi.fn();
+    const result = RotatingStampMinigame({ rule: bowRule, onComplete }) as any;
+
+    const [stopButton] = findAllButtons(result);
+    stopButton.props.onClick();
+
+    expect(onComplete).toHaveBeenCalledWith({ actual: -22.5, score: 'excellent' });
   });
 
   it('停止済み（stopped=true）の場合は「止める」ボタンが無効化される', () => {
