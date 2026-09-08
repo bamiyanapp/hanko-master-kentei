@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.6.0...v1.7.0) (2026-09-08)
+
+
+### Features
+
+* **stage-flow:** 申請画面と3ステージ進行（起票・再鑑・検閲）を実装する ([#283](https://github.com/bamiyanapp/hanko-master-kentei/issues/283)) ([4c2f994](https://github.com/bamiyanapp/hanko-master-kentei/commit/4c2f994dc90905892211043cef6d47105f07851c))
+
 # [1.6.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.5.0...v1.6.0) (2026-09-08)
 
 
