@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.10.0...v1.11.0) (2026-09-08)
+
+
+### Features
+
+* **content:** 初期案件コンテンツ（有給休暇申請・出張申請）を整備する ([#287](https://github.com/bamiyanapp/hanko-master-kentei/issues/287)) ([e909093](https://github.com/bamiyanapp/hanko-master-kentei/commit/e909093aa7573091b6bd11140590843631583edd))
+
 # [1.10.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.9.0...v1.10.0) (2026-09-08)
 
 
