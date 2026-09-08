@@ -113,6 +113,7 @@ describe('Home Component Integration', () => {
       vi.fn(), // screen
       vi.fn(), // selectedScenario
       vi.fn(), // scenarioResult
+      vi.fn(), // progress
     ];
     registeredEffects = [];
     mockLocation.search = '';
@@ -167,7 +168,7 @@ describe('Home Component Integration', () => {
   });
 
   it('should render ScenarioSelectionScreen with correct props when screen is selection', () => {
-    stateValues = ['selection', null, null];
+    stateValues = ['selection', null, null, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement<any>;
@@ -186,7 +187,7 @@ describe('Home Component Integration', () => {
   });
 
   it('should render ApplicationStageFlow with the selected scenario when screen is game', () => {
-    stateValues = ['game', pcPurchaseScenario, null];
+    stateValues = ['game', pcPurchaseScenario, null, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement<any>;
@@ -205,6 +206,31 @@ describe('Home Component Integration', () => {
     flow.props.onComplete(judgement);
     expect(stateSetters[2]).toHaveBeenCalledWith(judgement); // setScenarioResult
     expect(stateSetters[0]).toHaveBeenCalledWith('result'); // setScreen('result')
+    // 合格時はrecordScenarioClearを通じてprogressも更新される
+    // （overallScore=90 -> 基礎10点+round(90/10)=9点 = 19点）
+    expect(stateSetters[3]).toHaveBeenCalledWith({
+      rankIndex: 1,
+      points: 19,
+      clearedScenarioIds: [pcPurchaseScenario.id],
+    });
+  });
+
+  it('should not record progress when the scenario is not passed', () => {
+    stateValues = ['game', pcPurchaseScenario, null, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
+
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement<any>;
+
+    const flow = findByType(result, ApplicationStageFlow as any);
+    const judgement = {
+      overallScore: 30,
+      metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
+      passed: false,
+      comment: '残念ながら基準を満たしていません。再提出をお願いします。',
+    };
+    flow.props.onComplete(judgement);
+
+    expect(stateSetters[3]).not.toHaveBeenCalled(); // setProgressは呼ばれない
   });
 
   it('should render the result screen with metric scores and pass state', () => {
@@ -214,7 +240,7 @@ describe('Home Component Integration', () => {
       passed: true,
       comment: 'おおむね問題ありません。',
     };
-    stateValues = ['result', pcPurchaseScenario, judgement];
+    stateValues = ['result', pcPurchaseScenario, judgement, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
@@ -235,7 +261,7 @@ describe('Home Component Integration', () => {
       passed: false,
       comment: '残念ながら基準を満たしていません。再提出をお願いします。',
     };
-    stateValues = ['result', pcPurchaseScenario, judgement];
+    stateValues = ['result', pcPurchaseScenario, judgement, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
