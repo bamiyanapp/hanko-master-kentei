@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.11.1...v1.11.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* **pwa:** PWAアイコンの💮絵文字が中心より下寄りに表示される不具合を修正 ([#289](https://github.com/bamiyanapp/hanko-master-kentei/issues/289)) ([8e5a78a](https://github.com/bamiyanapp/hanko-master-kentei/commit/8e5a78a8c82877dcfbcc3c7fc764e237e4eaf776))
+
 ## [1.11.1](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.11.0...v1.11.1) (2026-09-08)
 
 
