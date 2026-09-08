@@ -5,7 +5,10 @@
   <!-- トップページの丸背景（bg-red-100 / border-red-200）と揃えた円 -->
   <circle cx="256" cy="256" r="200" fill="#fee2e2" stroke="#fecaca" stroke-width="10"/>
 
-  <!-- 💮（花丸） -->
-  <text x="256" y="288" text-anchor="middle" dominant-baseline="middle"
+  <!-- 💮（花丸）。dominant-baseline="middle"だけでは絵文字グリフの実際の
+       視覚的重心が円の中心よりも下寄りになる（フォント・レンダラー依存のため
+       実測で補正が必要、issue #243）。Playwrightで実測した結果、視覚的重心を
+       中心へ揃えるにはy=223.5が適切だった -->
+  <text x="256" y="223.5" text-anchor="middle" dominant-baseline="middle"
         font-family="'Noto Color Emoji'" font-size="260">💮</text>
 </svg>
