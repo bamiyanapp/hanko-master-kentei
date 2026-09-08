@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import Home, { judgeHankoAngle } from './page';
+import Home, { formatResultHeading, getFlavorMessage } from './page';
 import React from 'react';
 import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
-import { scenarios } from '@/data/scenarios';
+import RotatingStampMinigame from '@/components/RotatingStampMinigame';
+import { scenarios, pcPurchaseScenario } from '@/data/scenarios';
+import type { Rule } from '@/types/scenario';
 
 // window オブジェクトのモック
 const mockPushState = vi.fn();
@@ -56,24 +58,7 @@ vi.mock('react', async () => {
   };
 });
 
-// ReactElementツリーを再帰的に走査して、指定した条件に合う要素を探すヘルパー
-function findType(element: any, type: string): any {
-  if (!element) return undefined;
-  if (element.type === type) return element;
-  if (element.props && element.props.children) {
-    if (Array.isArray(element.props.children)) {
-      for (const child of element.props.children) {
-        const found = findType(child, type);
-        if (found) return found;
-      }
-    } else {
-      return findType(element.props.children, type);
-    }
-  }
-  return undefined;
-}
-
-// 要素内のすべてのテキストを取得するヘルパー
+// テキスト内容から要素を探すヘルパー
 function getElementText(element: any): string {
   if (!element) return '';
   if (typeof element === 'string') return element;
@@ -85,14 +70,12 @@ function getElementText(element: any): string {
   return '';
 }
 
-// テキスト内容から要素を探すヘルパー
 function findByText(element: any, text: string): any {
   if (!element) return undefined;
   if (typeof element === 'string' || typeof element === 'number') return undefined;
 
   const elementText = getElementText(element);
   if (elementText.includes(text)) {
-    // まずは子要素にマッチするReact要素があるか探す
     if (element.props && element.props.children) {
       if (Array.isArray(element.props.children)) {
         for (const child of element.props.children) {
@@ -104,11 +87,30 @@ function findByText(element: any, text: string): any {
         if (found) return found;
       }
     }
-    // 子要素にマッチするReact要素がなければ、自分自身を返す
     return element;
   }
   return undefined;
 }
+
+// ReactElementツリーを再帰的に走査して、指定したtype（コンポーネント関数）に
+// 一致する要素を探すヘルパー
+function findByType(element: any, type: any): any {
+  if (!element) return undefined;
+  if (element.type === type) return element;
+  if (element.props && element.props.children) {
+    if (Array.isArray(element.props.children)) {
+      for (const child of element.props.children) {
+        const found = findByType(child, type);
+        if (found) return found;
+      }
+    } else {
+      return findByType(element.props.children, type);
+    }
+  }
+  return undefined;
+}
+
+const demoRule = pcPurchaseScenario.stages[0].rules[0];
 
 describe('Home Component Integration', () => {
   beforeEach(() => {
@@ -116,10 +118,7 @@ describe('Home Component Integration', () => {
     stateValues = [];
     stateSetters = [
       vi.fn(), // screen
-      vi.fn(), // angle
-      vi.fn(), // judged
-      vi.fn(), // resultMessage
-      vi.fn(), // isPassed
+      vi.fn(), // minigameResult
     ];
     registeredEffects = [];
     mockLocation.search = '';
@@ -127,123 +126,99 @@ describe('Home Component Integration', () => {
   });
 
   it('should render top screen initially and transition to selection screen', () => {
-    // 1. 初期レンダリング（トップ画面）
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
     expect(result.type).toBe('main');
 
-    // ランク・スコア表示があることを確認
     const rankText = findByText(result, '見習い');
     expect(rankText).toBeDefined();
 
-    // 「検定を受ける」ボタンがあることを確認
     const startButton = findByText(result, '検定を受ける');
     expect(startButton).toBeDefined();
 
-    // 2. handleGoToSelectionの実行
     startButton.props.onClick();
     expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
   });
 
   it('should restore state from URL params in useEffect', () => {
-    // URLパラメータがある状態をシミュレート
-    mockLocation.search = '?screen=game&angle=-20&judged=true';
+    mockLocation.search = '?screen=game&actual=90&score=excellent';
     useStateCallCount = 0;
     Home();
 
-    // 登録されたuseEffectをすべて実行する
     registeredEffects.forEach((effect) => effect());
 
     expect(stateSetters[0]).toHaveBeenCalledWith('game'); // setScreen('game')
-    expect(stateSetters[1]).toHaveBeenCalledWith(-20); // setAngle(-20)
-    expect(stateSetters[2]).toHaveBeenCalledWith(true); // setJudged(true)
+    expect(stateSetters[1]).toHaveBeenCalledWith({ actual: 90, score: 'excellent' });
   });
 
   it('should render ScenarioSelectionScreen with correct props when screen is selection', () => {
-    stateValues = ['selection', 0, false, '', false];
+    stateValues = ['selection', null];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement<any>;
 
-    // ScenarioSelectionScreenへ委譲されることを確認（Home()は浅い評価のため、
-    // 子コンポーネント自体はレンダリングされず要素として返る）
     expect(result.type).toBe(ScenarioSelectionScreen);
     expect(result.props.scenarios).toBe(scenarios);
     expect(result.props.currentRank).toBe(0);
     expect(result.props.clearedScenarioIds).toEqual([]);
 
-    // シナリオ選択（onSelect）でゲーム画面へ遷移する
     result.props.onSelect(scenarios[0].id);
     expect(stateSetters[0]).toHaveBeenCalledWith('game'); // setScreen('game')
 
-    // 戻る（onBack）でトップ画面へ遷移する
     result.props.onBack();
     expect(stateSetters[0]).toHaveBeenCalledWith('top'); // setScreen('top')
   });
 
-  it('should render game state when screen is game', () => {
-    // screen='game', angle=-20, judged=false の状態をセット
-    stateValues = ['game', -20, false, '', false];
+  it('should render RotatingStampMinigame with the demo rule before a result exists', () => {
+    stateValues = ['game', null];
 
     useStateCallCount = 0;
-    const result = Home() as React.ReactElement;
+    const result = Home() as React.ReactElement<any>;
 
-    // ミッションの説明などがあることを確認
-    const mission = findByText(result, '稟議書（パソコン購入申請）に捺印しなさい。');
-    expect(mission).toBeDefined();
+    const minigame = findByType(result, RotatingStampMinigame as any);
+    expect(minigame).toBeDefined();
+    expect(minigame.props.rule).toBe(demoRule);
 
-    // スライダーの変更テスト
-    const input = findType(result, 'input');
-    expect(input).toBeDefined();
-    input.props.onChange({ target: { value: '-25' } });
-    expect(stateSetters[1]).toHaveBeenCalledWith(-25); // setAngle(-25)
-
-    // 「これで捺印を申請する」ボタンのテスト
-    const judgeButton = findByText(result, 'これで捺印を申請する');
-    expect(judgeButton).toBeDefined();
-    judgeButton.props.onClick();
-    expect(stateSetters[2]).toHaveBeenCalledWith(true); // setJudged(true)
+    // onCompleteでminigameResultが保存される
+    minigame.props.onComplete({ actual: 90, score: 'excellent' });
+    expect(stateSetters[1]).toHaveBeenCalledWith({ actual: 90, score: 'excellent' });
   });
 
-  it('should render result state when judged is true', () => {
-    // screen='game', angle=-20, judged=true, resultMessage='🎉 合格！', isPassed=true の状態をセット
-    stateValues = ['game', -20, true, '【合格】...', true];
+  it('should render result state when minigameResult exists (excellent)', () => {
+    stateValues = ['game', { actual: 90, score: 'excellent' }];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
 
-    // 合格表示
-    const passedText = findByText(result, '🎉 合格！');
+    const passedText = findByText(result, '合格');
     expect(passedText).toBeDefined();
 
-    // 「もう一度調整する」ボタンのテスト
     const resetButton = findByText(result, 'もう一度調整する');
     expect(resetButton).toBeDefined();
     resetButton.props.onClick();
-    expect(stateSetters[1]).toHaveBeenCalledWith(0); // setAngle(0)
-    expect(stateSetters[2]).toHaveBeenCalledWith(false); // setJudged(false)
+    expect(stateSetters[1]).toHaveBeenCalledWith(null); // setMinigameResult(null)
 
-    // 「案件選択へ戻る」ボタンのテスト
     const backButton = findByText(result, '案件選択へ戻る');
     expect(backButton).toBeDefined();
     backButton.props.onClick();
     expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
   });
 
-  it('should render result state when judged is true and isPassed is false', () => {
-    // screen='game', angle=0, judged=true, resultMessage='【差し戻し】...', isPassed=false の状態をセット
-    stateValues = ['game', 0, true, '【差し戻し】...', false];
+  it('should render result state when minigameResult exists (fail) and hide the return button', () => {
+    stateValues = ['game', { actual: 200, score: 'fail' }];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
 
-    // 差し戻し表示
-    const failedText = findByText(result, '❌ 差し戻し！');
+    const failedText = findByText(result, '差し戻し');
     expect(failedText).toBeDefined();
+
+    const backButton = findByText(result, '案件選択へ戻る');
+    expect(backButton).toBeUndefined();
   });
 
   it('should trigger updateUrl in handleGoToSelection on the game screen header', () => {
-    stateValues = ['game', -20, false, '', false];
+    stateValues = ['game', null];
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
 
@@ -254,28 +229,48 @@ describe('Home Component Integration', () => {
   });
 });
 
-describe('judgeHankoAngle', () => {
-  it('should return isPassed true and pass message for ideal angle (e.g. -20)', () => {
-    const result = judgeHankoAngle(-20);
-    expect(result.isPassed).toBe(true);
-    expect(result.message).toContain('合格');
+describe('formatResultHeading', () => {
+  it('excellentは合格（Excellent）', () => {
+    expect(formatResultHeading('excellent')).toContain('合格');
+    expect(formatResultHeading('excellent')).toContain('Excellent');
   });
 
-  it('should return isPassed false and straight message for 0 angle', () => {
-    const result = judgeHankoAngle(0);
-    expect(result.isPassed).toBe(false);
-    expect(result.message).toContain('直立不動');
+  it('goodは合格（Good）', () => {
+    expect(formatResultHeading('good')).toContain('合格');
   });
 
-  it('should return isPassed false and backward message for positive angle (e.g. 10)', () => {
-    const result = judgeHankoAngle(10);
-    expect(result.isPassed).toBe(false);
-    expect(result.message).toContain('のけぞっている');
+  it('failは差し戻し', () => {
+    expect(formatResultHeading('fail')).toContain('差し戻し');
+  });
+});
+
+describe('getFlavorMessage', () => {
+  const rule: Rule = {
+    id: 'r1',
+    description: 'test',
+    type: 'angle',
+    difficulty: 1,
+    target: -22.5,
+    tolerance: 12.5,
+  };
+
+  it('excellentは称賛メッセージ', () => {
+    const message = getFlavorMessage({ actual: -22.5, score: 'excellent' }, rule);
+    expect(message).toContain('見事');
   });
 
-  it('should return isPassed false and over-angled message for deep negative angle (e.g. -50)', () => {
-    const result = judgeHankoAngle(-50);
-    expect(result.isPassed).toBe(false);
-    expect(result.message).toContain('傾けすぎ');
+  it('goodは及第点メッセージ', () => {
+    const message = getFlavorMessage({ actual: -30, score: 'good' }, rule);
+    expect(message).toContain('及第点');
+  });
+
+  it('failで目標より大きい場合は敬意不足メッセージ', () => {
+    const message = getFlavorMessage({ actual: 50, score: 'fail' }, rule);
+    expect(message).toContain('敬意');
+  });
+
+  it('failで目標より小さい場合はやりすぎメッセージ', () => {
+    const message = getFlavorMessage({ actual: -90, score: 'fail' }, rule);
+    expect(message).toContain('やりすぎ');
   });
 });
