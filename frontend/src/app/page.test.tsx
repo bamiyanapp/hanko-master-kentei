@@ -114,6 +114,7 @@ describe('Home Component Integration', () => {
       vi.fn(), // selectedScenario
       vi.fn(), // scenarioResult
       vi.fn(), // progress
+      vi.fn(), // rankUpTo
     ];
     registeredEffects = [];
     mockLocation.search = '';
@@ -213,6 +214,33 @@ describe('Home Component Integration', () => {
       points: 19,
       clearedScenarioIds: [pcPurchaseScenario.id],
     });
+    // rankIndexが0(見習い)から1(初級)へ上がったので昇格演出が設定される
+    expect(stateSetters[4]).toHaveBeenCalledWith(1); // setRankUpTo(1)
+  });
+
+  it('should not set rankUpTo when the rank does not change', () => {
+    // 既にrankIndex=1（初級）の状態から、クリアしても閾値25未満のためランクは変わらない
+    stateValues = [
+      'game',
+      pcPurchaseScenario,
+      null,
+      { rankIndex: 1, points: 10, clearedScenarioIds: [] },
+    ];
+
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement<any>;
+
+    const flow = findByType(result, ApplicationStageFlow as any);
+    const judgement = {
+      overallScore: 30,
+      metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
+      passed: true,
+      comment: 'おおむね問題ありません。',
+    };
+    // 10点 + 基礎10点+round(30/10)=3点 = 23点（rankIndex=1のまま、25未満）
+    flow.props.onComplete(judgement);
+
+    expect(stateSetters[4]).toHaveBeenCalledWith(null); // setRankUpTo(null)
   });
 
   it('should not record progress when the scenario is not passed', () => {
@@ -240,18 +268,49 @@ describe('Home Component Integration', () => {
       passed: true,
       comment: 'おおむね問題ありません。',
     };
-    stateValues = ['result', pcPurchaseScenario, judgement, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
+    stateValues = [
+      'result',
+      pcPurchaseScenario,
+      judgement,
+      { rankIndex: 0, points: 0, clearedScenarioIds: [] },
+      null,
+    ];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
 
     expect(findByText(result, '承認されました')).toBeDefined();
     expect(findByText(result, 'おおむね問題ありません。')).toBeDefined();
+    expect(findByText(result, '昇格')).toBeUndefined(); // rankUpTo=nullなので昇格演出は出ない
 
     const backButton = findByText(result, '案件選択へ戻る');
     expect(backButton).toBeDefined();
     backButton.props.onClick();
     expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
+    expect(stateSetters[4]).toHaveBeenCalledWith(null); // setRankUpTo(null)
+  });
+
+  it('should render the rank-up banner on the result screen when rankUpTo is set', () => {
+    const judgement = {
+      overallScore: 90,
+      metricScores: { 格式: null, 礼節: 90, 誠意: null, 精密性: 80 },
+      passed: true,
+      comment: 'おおむね問題ありません。',
+    };
+    stateValues = [
+      'result',
+      pcPurchaseScenario,
+      judgement,
+      { rankIndex: 1, points: 19, clearedScenarioIds: [pcPurchaseScenario.id] },
+      1,
+    ];
+
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement;
+
+    const banner = findByText(result, '昇格');
+    expect(banner).toBeDefined();
+    expect(findByText(result, '初級')).toBeDefined();
   });
 
   it('should render the result screen with a failure heading when not passed', () => {
