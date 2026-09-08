@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.9.0...v1.10.0) (2026-09-08)
+
+
+### Features
+
+* **ending:** 最高ランク到達時のエンディング演出を実装する ([#286](https://github.com/bamiyanapp/hanko-master-kentei/issues/286)) ([16493d4](https://github.com/bamiyanapp/hanko-master-kentei/commit/16493d46c88eaad52fc4c087fe27af96c1f78da6))
+
 # [1.9.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.8.0...v1.9.0) (2026-09-08)
 
 
