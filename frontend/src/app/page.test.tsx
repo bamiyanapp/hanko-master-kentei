@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Home, { judgeHankoAngle } from './page';
 import React from 'react';
+import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
+import { scenarios } from '@/data/scenarios';
 
 // window オブジェクトのモック
 const mockPushState = vi.fn();
@@ -113,7 +115,7 @@ describe('Home Component Integration', () => {
     useStateCallCount = 0;
     stateValues = [];
     stateSetters = [
-      vi.fn(), // isStarted
+      vi.fn(), // screen
       vi.fn(), // angle
       vi.fn(), // judged
       vi.fn(), // resultMessage
@@ -124,40 +126,64 @@ describe('Home Component Integration', () => {
     mockPushState.mockClear();
   });
 
-  it('should render initial state and check transitions', () => {
-    // 1. 初期レンダリング
+  it('should render top screen initially and transition to selection screen', () => {
+    // 1. 初期レンダリング（トップ画面）
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
     expect(result.type).toBe('main');
 
-    // 「検定を開始する」ボタンがあることを確認
-    const startButton = findByText(result, '検定を開始する');
+    // ランク・スコア表示があることを確認
+    const rankText = findByText(result, '見習い');
+    expect(rankText).toBeDefined();
+
+    // 「検定を受ける」ボタンがあることを確認
+    const startButton = findByText(result, '検定を受ける');
     expect(startButton).toBeDefined();
 
-    // 2. handleStartの実行
+    // 2. handleGoToSelectionの実行
     startButton.props.onClick();
-    expect(stateSetters[0]).toHaveBeenCalledWith(true); // setIsStarted(true)
-    expect(stateSetters[1]).toHaveBeenCalledWith(0);    // setAngle(0)
-    expect(stateSetters[2]).toHaveBeenCalledWith(false); // setJudged(false)
+    expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
   });
 
   it('should restore state from URL params in useEffect', () => {
     // URLパラメータがある状態をシミュレート
-    mockLocation.search = '?started=true&angle=-20&judged=true';
+    mockLocation.search = '?screen=game&angle=-20&judged=true';
     useStateCallCount = 0;
     Home();
 
     // 登録されたuseEffectをすべて実行する
     registeredEffects.forEach((effect) => effect());
 
-    expect(stateSetters[0]).toHaveBeenCalledWith(true); // setIsStarted(true)
-    expect(stateSetters[1]).toHaveBeenCalledWith(-20);  // setAngle(-20)
-    expect(stateSetters[2]).toHaveBeenCalledWith(true);  // setJudged(true)
+    expect(stateSetters[0]).toHaveBeenCalledWith('game'); // setScreen('game')
+    expect(stateSetters[1]).toHaveBeenCalledWith(-20); // setAngle(-20)
+    expect(stateSetters[2]).toHaveBeenCalledWith(true); // setJudged(true)
   });
 
-  it('should render game state when isStarted is true', () => {
-    // isStarted=true, angle=-20, judged=false の状態をセット
-    stateValues = [true, -20, false, '', false];
+  it('should render ScenarioSelectionScreen with correct props when screen is selection', () => {
+    stateValues = ['selection', 0, false, '', false];
+
+    useStateCallCount = 0;
+    const result = Home() as React.ReactElement<any>;
+
+    // ScenarioSelectionScreenへ委譲されることを確認（Home()は浅い評価のため、
+    // 子コンポーネント自体はレンダリングされず要素として返る）
+    expect(result.type).toBe(ScenarioSelectionScreen);
+    expect(result.props.scenarios).toBe(scenarios);
+    expect(result.props.currentRank).toBe(0);
+    expect(result.props.clearedScenarioIds).toEqual([]);
+
+    // シナリオ選択（onSelect）でゲーム画面へ遷移する
+    result.props.onSelect(scenarios[0].id);
+    expect(stateSetters[0]).toHaveBeenCalledWith('game'); // setScreen('game')
+
+    // 戻る（onBack）でトップ画面へ遷移する
+    result.props.onBack();
+    expect(stateSetters[0]).toHaveBeenCalledWith('top'); // setScreen('top')
+  });
+
+  it('should render game state when screen is game', () => {
+    // screen='game', angle=-20, judged=false の状態をセット
+    stateValues = ['game', -20, false, '', false];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
@@ -180,8 +206,8 @@ describe('Home Component Integration', () => {
   });
 
   it('should render result state when judged is true', () => {
-    // isStarted=true, angle=-20, judged=true, resultMessage='🎉 合格！', isPassed=true の状態をセット
-    stateValues = [true, -20, true, '【合格】...', true];
+    // screen='game', angle=-20, judged=true, resultMessage='🎉 合格！', isPassed=true の状態をセット
+    stateValues = ['game', -20, true, '【合格】...', true];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
@@ -197,16 +223,16 @@ describe('Home Component Integration', () => {
     expect(stateSetters[1]).toHaveBeenCalledWith(0); // setAngle(0)
     expect(stateSetters[2]).toHaveBeenCalledWith(false); // setJudged(false)
 
-    // 「メイン画面へ戻る」ボタンのテスト
-    const backButton = findByText(result, 'メイン画面へ戻る');
+    // 「案件選択へ戻る」ボタンのテスト
+    const backButton = findByText(result, '案件選択へ戻る');
     expect(backButton).toBeDefined();
     backButton.props.onClick();
-    expect(stateSetters[0]).toHaveBeenCalledWith(false); // setIsStarted(false)
+    expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
   });
 
   it('should render result state when judged is true and isPassed is false', () => {
-    // isStarted=true, angle=0, judged=true, resultMessage='【差し戻し】...', isPassed=false の状態をセット
-    stateValues = [true, 0, true, '【差し戻し】...', false];
+    // screen='game', angle=0, judged=true, resultMessage='【差し戻し】...', isPassed=false の状態をセット
+    stateValues = ['game', 0, true, '【差し戻し】...', false];
 
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
@@ -216,15 +242,15 @@ describe('Home Component Integration', () => {
     expect(failedText).toBeDefined();
   });
 
-  it('should trigger updateUrl in handleBackToTop on the page header', () => {
-    stateValues = [true, -20, false, '', false];
+  it('should trigger updateUrl in handleGoToSelection on the game screen header', () => {
+    stateValues = ['game', -20, false, '', false];
     useStateCallCount = 0;
     const result = Home() as React.ReactElement;
 
     const backButton = findByText(result, '戻る');
     expect(backButton).toBeDefined();
     backButton.props.onClick();
-    expect(stateSetters[0]).toHaveBeenCalledWith(false);
+    expect(stateSetters[0]).toHaveBeenCalledWith('selection');
   });
 });
 
