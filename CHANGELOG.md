@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.1.0...v1.2.0) (2026-09-08)
+
+
+### Features
+
+* **ui:** トップ画面・案件選択画面を実装する ([#278](https://github.com/bamiyanapp/hanko-master-kentei/issues/278)) ([b6cca9b](https://github.com/bamiyanapp/hanko-master-kentei/commit/b6cca9b4cf8f5bcfed9d8d6ab34842c1a782d9e7))
+
 # [1.1.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.0.2...v1.1.0) (2026-09-08)
 
 
