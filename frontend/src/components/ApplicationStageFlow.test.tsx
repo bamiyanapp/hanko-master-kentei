@@ -4,6 +4,8 @@ import ApplicationStageFlow, { CustomRuleStub } from './ApplicationStageFlow';
 import RotatingStampMinigame from './RotatingStampMinigame';
 import LongPressStampMinigame from './LongPressStampMinigame';
 import DragDropStampMinigame from './DragDropStampMinigame';
+import TiltStampMinigame from './TiltStampMinigame';
+import MovingStampTapMinigame from './MovingStampTapMinigame';
 import type { Scenario } from '@/types/scenario';
 
 // page.test.tsx等と同じ方針: jsdomを使わず、useStateをモックしてReact要素
@@ -313,6 +315,63 @@ describe('ApplicationStageFlow', () => {
     const finalJudgement = onComplete.mock.calls[0][0];
     // 全5件（3件excellent + 1件excellent + 1件good）の総合判定
     expect(finalJudgement.passed).toBe(true);
+  });
+
+  it('tiltルールはTiltStampMinigameへ渡される', () => {
+    const scenario: Scenario = {
+      id: 'tilt-scenario',
+      title: 'お辞儀捺印テスト案件',
+      description: 'テスト用',
+      requiredRank: 0,
+      stages: [
+        {
+          id: 'stage-tilt',
+          type: 'kito',
+          rules: [
+            { id: 'tilt-rule', description: '傾きルール', type: 'tilt', difficulty: 2, target: 15, tolerance: 5 },
+          ],
+        },
+      ],
+    };
+    stateValues = [0, 0, [], [], null];
+    useStateCallCount = 0;
+    const result = ApplicationStageFlow({ scenario, onComplete: vi.fn(), onBack: vi.fn() }) as any;
+
+    const minigame = findByType(result, TiltStampMinigame as any);
+    expect(minigame).toBeDefined();
+    expect(minigame.props.rule).toBe(scenario.stages[0].rules[0]);
+  });
+
+  it('moving-tapルールはMovingStampTapMinigameへ渡される', () => {
+    const scenario: Scenario = {
+      id: 'moving-tap-scenario',
+      title: '飛び回る印鑑テスト案件',
+      description: 'テスト用',
+      requiredRank: 0,
+      stages: [
+        {
+          id: 'stage-moving-tap',
+          type: 'kito',
+          rules: [
+            {
+              id: 'moving-tap-rule',
+              description: 'タイミングルール',
+              type: 'moving-tap',
+              difficulty: 2,
+              target: 50,
+              tolerance: 10,
+            },
+          ],
+        },
+      ],
+    };
+    stateValues = [0, 0, [], [], null];
+    useStateCallCount = 0;
+    const result = ApplicationStageFlow({ scenario, onComplete: vi.fn(), onBack: vi.fn() }) as any;
+
+    const minigame = findByType(result, MovingStampTapMinigame as any);
+    expect(minigame).toBeDefined();
+    expect(minigame.props.rule).toBe(scenario.stages[0].rules[0]);
   });
 
   it('「戻る」ボタンでonBackが呼ばれる', () => {

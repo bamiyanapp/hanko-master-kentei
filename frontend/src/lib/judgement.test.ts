@@ -41,6 +41,18 @@ describe('judge', () => {
     expect(result.metricScores.精密性).toBe(100);
   });
 
+  it('tiltルールの結果は礼節指標に反映される（issue #205）', () => {
+    const results: RuleResult[] = [{ rule: makeRule('tilt'), score: 'good' }];
+    const result = judge(results);
+    expect(result.metricScores.礼節).toBe(70);
+  });
+
+  it('moving-tapルールの結果は格式指標に反映される（issue #205）', () => {
+    const results: RuleResult[] = [{ rule: makeRule('moving-tap'), score: 'excellent' }];
+    const result = judge(results);
+    expect(result.metricScores.格式).toBe(100);
+  });
+
   it('customルールはどの指標にも反映されないが、総合スコアには反映される', () => {
     const results: RuleResult[] = [{ rule: makeRule('custom'), score: 'excellent' }];
     const result = judge(results);

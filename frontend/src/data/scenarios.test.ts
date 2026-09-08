@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { scenarios, pcPurchaseScenario, paidLeaveScenario, getScenarioById } from './scenarios';
+import {
+  scenarios,
+  pcPurchaseScenario,
+  paidLeaveScenario,
+  officeSuppliesScenario,
+  getScenarioById,
+} from './scenarios';
 
 describe('scenarios', () => {
-  it('issue #202の要件通り、案件が2〜3件存在する', () => {
+  it('issue #202・#205の要件通り、案件が2件以上存在する', () => {
     expect(scenarios.length).toBeGreaterThanOrEqual(2);
-    expect(scenarios.length).toBeLessThanOrEqual(3);
   });
 
   it('シナリオ間でidが重複しない', () => {
@@ -64,10 +69,22 @@ describe('scenarios', () => {
   it('getScenarioByIdでidから取得できる', () => {
     expect(getScenarioById('pc-purchase')).toBe(pcPurchaseScenario);
     expect(getScenarioById('paid-leave')).toBe(paidLeaveScenario);
+    expect(getScenarioById('office-supplies')).toBe(officeSuppliesScenario);
     expect(getScenarioById('not-exist')).toBeUndefined();
   });
 
   it('requiredRankが0の案件が最低1件あり、初期状態から遊べる', () => {
     expect(scenarios.some((scenario) => scenario.requiredRank === 0)).toBe(true);
+  });
+
+  it('issue #205で追加したtilt・moving-tap型ルールを含む案件が存在する', () => {
+    const hasTilt = scenarios.some((scenario) =>
+      scenario.stages.some((stage) => stage.rules.some((rule) => rule.type === 'tilt')),
+    );
+    const hasMovingTap = scenarios.some((scenario) =>
+      scenario.stages.some((stage) => stage.rules.some((rule) => rule.type === 'moving-tap')),
+    );
+    expect(hasTilt).toBe(true);
+    expect(hasMovingTap).toBe(true);
   });
 });

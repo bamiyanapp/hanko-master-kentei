@@ -7,6 +7,8 @@ import { judge, type JudgementResult, type RuleResult } from '@/lib/judgement';
 import RotatingStampMinigame from './RotatingStampMinigame';
 import LongPressStampMinigame from './LongPressStampMinigame';
 import DragDropStampMinigame from './DragDropStampMinigame';
+import TiltStampMinigame from './TiltStampMinigame';
+import MovingStampTapMinigame from './MovingStampTapMinigame';
 
 type MinigameResult = { actual: number; score: MinigameScore };
 
@@ -61,6 +63,10 @@ function renderRuleMinigame(rule: Rule, onComplete: (result: MinigameResult) => 
           onComplete={onComplete}
         />
       );
+    case 'tilt':
+      return <TiltStampMinigame rule={rule} onComplete={onComplete} />;
+    case 'moving-tap':
+      return <MovingStampTapMinigame rule={rule} onComplete={onComplete} />;
     case 'custom':
     default:
       return <CustomRuleStub rule={rule} onComplete={onComplete} />;

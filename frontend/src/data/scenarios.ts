@@ -245,8 +245,96 @@ export const businessTripScenario: Scenario = {
   ],
 };
 
+// 「備品購入申請」案件（issue #205、Phase 2）。#191「案件ごとのテーマ」表の
+// 風刺対象は「前例主義」。issue #205で追加した2種の捺印ミニゲーム
+// （tilt: お辞儀捺印、moving-tap: 飛び回る印鑑）を初めて使う案件とした。
+// requiredRank: 2（中級以上）とし、MVPの3案件よりもさらに先の解放条件が
+// 実際に機能することを示す。
+export const officeSuppliesScenario: Scenario = {
+  id: 'office-supplies',
+  title: '備品購入申請',
+  description:
+    'モニターアームを1つ購入したい。金額はごく小さいが、過去の決裁例と寸分違わぬ体裁を踏襲することが求められる。',
+  requiredRank: 2,
+  stages: [
+    {
+      id: 'office-supplies-kito',
+      type: 'kito',
+      rules: [
+        {
+          id: 'kito-precedent-tilt',
+          description:
+            '3年前の同種申請（モニターアーム）の決裁書と寸分違わぬ角度になるよう、印影を傾けて捺印すること。',
+          type: 'tilt',
+          difficulty: 2,
+          target: 10,
+          tolerance: 5,
+        },
+      ],
+    },
+    {
+      id: 'office-supplies-saikan',
+      type: 'saikan',
+      rules: [
+        {
+          id: 'saikan-precedent-tilt',
+          description: '起票時と同じ、前例通りの傾きを維持して再捺印すること。',
+          type: 'tilt',
+          difficulty: 3,
+          target: 10,
+          tolerance: 4,
+        },
+        {
+          id: 'saikan-precedent-timing',
+          description:
+            '画面内を移動する印鑑を、前例の決裁が行われた「タイミング」（画面中央付近）で捺印すること。早すぎても遅すぎても「前例と異なる」と判定される。',
+          type: 'moving-tap',
+          difficulty: 3,
+          target: 50,
+          tolerance: 12,
+        },
+      ],
+    },
+    {
+      id: 'office-supplies-kenetsu',
+      type: 'kenetsu',
+      rules: [
+        {
+          id: 'kenetsu-precedent-tilt',
+          description: '前例通りの傾きは引き続き維持すること。検閲では許容誤差がさらに狭まる。',
+          type: 'tilt',
+          difficulty: 4,
+          target: 10,
+          tolerance: 3,
+        },
+        {
+          id: 'kenetsu-precedent-position',
+          description:
+            '前例の決裁書と同じく、課長印から0.6mm離して配置すること。1mmでも異なると「前例逸脱」とみなされる。',
+          type: 'position',
+          difficulty: 4,
+          target: 0.6,
+          tolerance: 0.2,
+        },
+        {
+          id: 'kenetsu-precedent-manner',
+          description:
+            '3年前の決裁時に在籍していた総務担当者の在職期間が現在も続いているものとみなし、その担当者の当時の心境を推し量った上で捺印すること（当時の担当者は既に退職している）。',
+          type: 'custom',
+          difficulty: 5,
+        },
+      ],
+    },
+  ],
+};
+
 // 案件（シナリオ）一覧。新しい案件を追加する場合はここに追加するだけでよい。
-export const scenarios: Scenario[] = [pcPurchaseScenario, paidLeaveScenario, businessTripScenario];
+export const scenarios: Scenario[] = [
+  pcPurchaseScenario,
+  paidLeaveScenario,
+  businessTripScenario,
+  officeSuppliesScenario,
+];
 
 export function getScenarioById(id: string): Scenario | undefined {
   return scenarios.find((scenario) => scenario.id === id);
