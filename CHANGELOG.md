@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.11.0...v1.11.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **ui:** 共通CSS（フォント）をshared/ui/bootstrap-theme.css経由で適用する ([#288](https://github.com/bamiyanapp/hanko-master-kentei/issues/288)) ([a3b3b1e](https://github.com/bamiyanapp/hanko-master-kentei/commit/a3b3b1ec17a53ac560d4104cfb7c0f40004d89d6))
+
 # [1.11.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.10.0...v1.11.0) (2026-09-08)
 
 
