@@ -1,9 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { scenarios, pcPurchaseScenario, getScenarioById } from './scenarios';
+import { scenarios, pcPurchaseScenario, paidLeaveScenario, getScenarioById } from './scenarios';
 
 describe('scenarios', () => {
-  it('サンプルシナリオが最低1件存在する', () => {
-    expect(scenarios.length).toBeGreaterThanOrEqual(1);
+  it('issue #202の要件通り、案件が2〜3件存在する', () => {
+    expect(scenarios.length).toBeGreaterThanOrEqual(2);
+    expect(scenarios.length).toBeLessThanOrEqual(3);
+  });
+
+  it('シナリオ間でidが重複しない', () => {
+    const scenarioIds = scenarios.map((scenario) => scenario.id);
+    expect(new Set(scenarioIds).size).toBe(scenarioIds.length);
+  });
+
+  it('ステージが進むごとにルール数または難易度が上がる（マナーのエスカレーション）', () => {
+    for (const scenario of scenarios) {
+      const ruleCounts = scenario.stages.map((stage) => stage.rules.length);
+      // 起票が最少ルール数であること（issue #191「起票=単一条件」に対応）
+      expect(ruleCounts[0]).toBeLessThanOrEqual(ruleCounts[1]);
+      expect(ruleCounts[1]).toBeLessThanOrEqual(ruleCounts[2]);
+
+      const maxDifficultyPerStage = scenario.stages.map((stage) =>
+        Math.max(...stage.rules.map((rule) => rule.difficulty)),
+      );
+      // 検閲ステージには最も難易度の高いルール（謎マナー）が含まれること
+      expect(maxDifficultyPerStage[2]).toBeGreaterThanOrEqual(maxDifficultyPerStage[0]);
+    }
+  });
+
+  it('少なくとも1件のcustom型ルール（謎マナー）を含む案件が2件以上ある', () => {
+    const scenariosWithCustomRule = scenarios.filter((scenario) =>
+      scenario.stages.some((stage) => stage.rules.some((rule) => rule.type === 'custom')),
+    );
+    expect(scenariosWithCustomRule.length).toBeGreaterThanOrEqual(2);
   });
 
   it('各シナリオが起票・再鑑・検閲の3ステージを持つ', () => {
@@ -35,6 +63,11 @@ describe('scenarios', () => {
 
   it('getScenarioByIdでidから取得できる', () => {
     expect(getScenarioById('pc-purchase')).toBe(pcPurchaseScenario);
+    expect(getScenarioById('paid-leave')).toBe(paidLeaveScenario);
     expect(getScenarioById('not-exist')).toBeUndefined();
+  });
+
+  it('requiredRankが0の案件が最低1件あり、初期状態から遊べる', () => {
+    expect(scenarios.some((scenario) => scenario.requiredRank === 0)).toBe(true);
   });
 });
