@@ -1,3 +1,7 @@
+/* フロントエンド共通UI規約（dev-standards docs/frontend-ui-conventions.md）に基づき、
+   共通フォント・ボタン押下フィードバック等を提供する共通テーマを適用する（issue #240） */
+@import "./bootstrap-theme.css";
+
 /* トップ画面の背景グラデーション（Bootstrapに任意二色グラデーションのユーティリティが無いため個別定義、issue #225） */
 .hero-gradient {
   background: linear-gradient(to bottom, #fef2f2, #ffffff);
@@ -18,5 +22,4 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
 }
