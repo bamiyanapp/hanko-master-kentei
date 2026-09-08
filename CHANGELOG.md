@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.0.2...v1.1.0) (2026-09-08)
+
+
+### Features
+
+* **data:** Scenario/Stage/Ruleの型定義とサンプルシナリオを追加する ([#277](https://github.com/bamiyanapp/hanko-master-kentei/issues/277)) ([9fbc10e](https://github.com/bamiyanapp/hanko-master-kentei/commit/9fbc10e7e4c4f8634fe104ae3638101f2ab61e27))
+
 ## [1.0.2](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.0.1...v1.0.2) (2026-09-04)
 
 
