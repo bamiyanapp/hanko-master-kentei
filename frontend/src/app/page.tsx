@@ -4,8 +4,13 @@ import React, { useState } from 'react';
 
 import { useEffect } from 'react';
 import { playClickSound, playSuccessSound, playFailureSound } from './sfx';
-import { scenarios } from '@/data/scenarios';
+import { scenarios, pcPurchaseScenario } from '@/data/scenarios';
 import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
+import RotatingStampMinigame, {
+  type RotatingStampResult,
+} from '@/components/RotatingStampMinigame';
+import type { MinigameScore } from '@/lib/scoring';
+import type { Rule } from '@/types/scenario';
 
 type Screen = 'top' | 'selection' | 'game';
 
@@ -17,26 +22,27 @@ const CURRENT_RANK = 0;
 const CERTIFICATION_SCORE = 0;
 const CLEARED_SCENARIO_IDS: string[] = [];
 
+// MVPでは案件を1件のみサンプル実装しているため、案件選択に関わらず起票ステージの
+// 単一ルールで固定のデモとする。案件ごとの複数ステージ進行は#194で実装する。
+const DEMO_STAGE = pcPurchaseScenario.stages[0];
+const DEMO_RULE = DEMO_STAGE.rules[0];
+
+const isValidScore = (value: string | null): value is MinigameScore =>
+  value === 'excellent' || value === 'good' || value === 'fail';
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('top');
-  const [angle, setAngle] = useState(0); // 角度（度数法：-180 〜 180）
-  const [judged, setJudged] = useState(false);
-  const [resultMessage, setResultMessage] = useState('');
-  const [isPassed, setIsPassed] = useState(false);
+  const [minigameResult, setMinigameResult] = useState<RotatingStampResult | null>(null);
 
   // URLパラメータと状態の同期用関数
-  const updateUrl = (currentScreen: Screen, currentAngle: number, currentJudged: boolean) => {
+  const updateUrl = (currentScreen: Screen, result: RotatingStampResult | null) => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams();
     if (currentScreen !== 'top') {
       params.set('screen', currentScreen);
-      if (currentScreen === 'game') {
-        if (currentAngle !== 0) {
-          params.set('angle', currentAngle.toString());
-        }
-        if (currentJudged) {
-          params.set('judged', 'true');
-        }
+      if (currentScreen === 'game' && result) {
+        params.set('actual', result.actual.toString());
+        params.set('score', result.score);
       }
     }
     const newSearch = params.toString();
@@ -51,68 +57,50 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
 
     const screenParam = params.get('screen');
-    const angleParam = Number(params.get('angle') || 0);
-    const judgedParam = params.get('judged') === 'true';
+    const actualParam = params.get('actual');
+    const scoreParam = params.get('score');
 
     if (screenParam === 'selection' || screenParam === 'game') {
       setScreen(screenParam);
     }
-    if (angleParam !== 0) {
-      setAngle(angleParam);
-    }
-    if (judgedParam) {
-      setJudged(true);
-      const result = judgeHankoAngle(angleParam);
-      setIsPassed(result.isPassed);
-      setResultMessage(result.message);
+    if (actualParam !== null && isValidScore(scoreParam)) {
+      setMinigameResult({ actual: Number(actualParam), score: scoreParam });
     }
   }, []);
 
   const handleGoToSelection = () => {
     playClickSound();
     setScreen('selection');
-    updateUrl('selection', 0, false);
+    updateUrl('selection', null);
   };
 
   const handleSelectScenario = () => {
-    // MVPでは案件を1件のみサンプル実装しているため、選択された案件に関わらず
-    // 既存のゲーム画面（お辞儀ハンコ）へ遷移する。案件ごとのステージ進行は
-    // #194で実装する。
     playClickSound();
     setScreen('game');
-    setAngle(0);
-    setJudged(false);
-    setResultMessage('');
-    setIsPassed(false);
-    updateUrl('game', 0, false);
+    setMinigameResult(null);
+    updateUrl('game', null);
   };
 
-  const handleJudge = () => {
-    setJudged(true);
-    const result = judgeHankoAngle(angle);
-    setIsPassed(result.isPassed);
-    setResultMessage(result.message);
-    updateUrl('game', angle, true);
-    if (result.isPassed) {
-      playSuccessSound();
-    } else {
+  const handleMinigameComplete = (result: RotatingStampResult) => {
+    setMinigameResult(result);
+    updateUrl('game', result);
+    if (result.score === 'fail') {
       playFailureSound();
+    } else {
+      playSuccessSound();
     }
   };
 
-  const handleReset = () => {
+  const handleRetry = () => {
     playClickSound();
-    setAngle(0);
-    setJudged(false);
-    setResultMessage('');
-    setIsPassed(false);
-    updateUrl('game', 0, false);
+    setMinigameResult(null);
+    updateUrl('game', null);
   };
 
   const handleBackToTop = () => {
     playClickSound();
     setScreen('top');
-    updateUrl('top', 0, false);
+    updateUrl('top', null);
   };
 
   if (screen === 'selection') {
@@ -135,11 +123,9 @@ export default function Home() {
             <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
               <div>
                 <span className="badge bg-danger-subtle text-danger-emphasis">
-                  ステージ 1
+                  ステージ 1（起票）
                 </span>
-                <h2 className="fs-4 fw-bold mt-1">
-                  課長承認：はじめてのお辞儀ハンコ
-                </h2>
+                <h2 className="fs-4 fw-bold mt-1">{pcPurchaseScenario.title}</h2>
               </div>
               <button
                 onClick={handleGoToSelection}
@@ -153,147 +139,33 @@ export default function Home() {
               <h3 className="alert-heading fs-6 fw-semibold mb-1">
                 ミッション
               </h3>
-              <p className="small mb-0">
-                稟議書（パソコン購入申請）に捺印しなさい。
-                ただし、日本企業の伝統マナーに基づき、
-                <strong>上司（課長）に向かってお辞儀をするように、左に少し傾けて（お辞儀ハンコ）</strong>
-                捺印すること。
-              </p>
-            </div>
-
-            {/* 稟議書風のプレビュー領域 */}
-            <div className="doc-preview p-4 p-md-5 bg-white mb-4 position-relative overflow-hidden d-flex flex-column justify-content-between">
-              <div className="text-center">
-                <h3 className="fs-4 fw-bold border-bottom border-2 pb-2 d-inline-block">
-                  パソコン購入稟議書
-                </h3>
-              </div>
-
-              <div className="my-4 small text-secondary">
-                <p>
-                  <strong>件名：</strong> 開発用ハイスペックPCの新規調達
-                </p>
-                <p>
-                  <strong>理由：</strong> 現行のPCスペック不足により、ビルドおよびデバッグに著しい支障が出ているため。
-                </p>
-              </div>
-
-              {/* 捺印欄 */}
-              <div className="d-flex justify-content-end mt-3">
-                <div className="d-flex border border-dark text-center">
-                  <div className="border-end border-dark" style={{ width: '5rem' }}>
-                    <div className="bg-body-secondary small py-1 border-bottom border-dark">
-                      部長
-                    </div>
-                    <div
-                      className="d-flex align-items-center justify-content-center text-body-tertiary small user-select-none"
-                      style={{ height: '4rem' }}
-                    >
-                      （未承認）
-                    </div>
-                  </div>
-                  <div className="border-end border-dark position-relative" style={{ width: '5rem' }}>
-                    <div className="bg-body-secondary small py-1 border-bottom border-dark">
-                      課長
-                    </div>
-                    <div
-                      className="d-flex align-items-center justify-content-center"
-                      style={{ height: '4rem' }}
-                    >
-                      {/* 捺印される印影 */}
-                      <div
-                        style={{
-                          transform: `rotate(${angle}deg)`,
-                          transition: judged ? 'transform 0.5s ease' : 'none',
-                          width: '3rem',
-                          height: '3rem',
-                        }}
-                        className={`rounded-circle border border-2 border-danger d-flex align-items-center justify-content-center text-danger fw-bold user-select-none ${
-                          judged ? 'opacity-100' : 'opacity-50'
-                        }`}
-                      >
-                        <span className="small d-block" style={{ letterSpacing: '0.2em', lineHeight: 1 }}>
-                          鈴木
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ width: '5rem' }}>
-                    <div className="bg-body-secondary small py-1 border-bottom border-dark">
-                      起案者
-                    </div>
-                    <div
-                      className="d-flex align-items-center justify-content-center"
-                      style={{ height: '4rem' }}
-                    >
-                      <div
-                        className="rounded-circle border border-2 border-danger d-flex align-items-center justify-content-center text-danger small fw-semibold user-select-none"
-                        style={{ width: '3rem', height: '3rem' }}
-                      >
-                        鈴木
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p className="small mb-0">{pcPurchaseScenario.description}</p>
             </div>
 
             {/* 判定結果の表示 */}
-            {judged && (
-              <div className={`alert ${isPassed ? 'alert-success' : 'alert-danger'} mb-4`}>
+            {minigameResult && (
+              <div
+                className={`alert ${minigameResult.score !== 'fail' ? 'alert-success' : 'alert-danger'} mb-4`}
+              >
                 <h4 className="alert-heading fs-6 fw-bold mb-1">
-                  {isPassed ? '🎉 合格！' : '❌ 差し戻し！'}
+                  {formatResultHeading(minigameResult.score)}
                 </h4>
-                <p className="small mb-0">{resultMessage}</p>
+                <p className="small mb-0">{getFlavorMessage(minigameResult, DEMO_RULE)}</p>
               </div>
             )}
 
             {/* コントロールパネル */}
-            {!judged ? (
-              <div className="d-flex flex-column gap-3">
-                <div>
-                  <label className="d-flex justify-content-between small fw-semibold mb-1">
-                    <span>お辞儀角度の調整: {angle}度</span>
-                    <span className="small text-secondary">
-                      ※左へ傾けるほどマイナス
-                    </span>
-                  </label>
-                  <input
-                    type="range"
-                    min="-90"
-                    max="90"
-                    value={angle}
-                    onChange={(e) => {
-                      const newAngle = Number(e.target.value);
-                      setAngle(newAngle);
-                      updateUrl('game', newAngle, judged);
-                    }}
-                    className="form-range"
-                    style={{ accentColor: 'var(--bs-danger)' }}
-                  />
-                  <div className="d-flex justify-content-between small text-secondary px-1 mt-1">
-                    <span>← 左に深くお辞儀 (-90度)</span>
-                    <span>真っ直ぐ (0度)</span>
-                    <span>右にのけぞる (+90度) →</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleJudge}
-                  className="btn btn-danger w-100 py-2 fw-bold shadow-sm"
-                >
-                  これで捺印を申請する
-                </button>
-              </div>
+            {!minigameResult ? (
+              <RotatingStampMinigame rule={DEMO_RULE} onComplete={handleMinigameComplete} />
             ) : (
               <div className="d-flex gap-3">
                 <button
-                  onClick={handleReset}
+                  onClick={handleRetry}
                   className="btn btn-outline-secondary flex-fill py-2 fw-bold"
                 >
                   もう一度調整する
                 </button>
-                {isPassed && (
+                {minigameResult.score !== 'fail' && (
                   <button
                     onClick={handleGoToSelection}
                     className="btn btn-success flex-fill py-2 fw-bold shadow-sm"
@@ -366,29 +238,26 @@ function formatBuildInfo(): string {
   return [version && `v${version}`, sha, time].filter(Boolean).join(' / ');
 }
 
-export function judgeHankoAngle(angle: number): { isPassed: boolean; message: string } {
-  // マナー判定：お辞儀ハンコは、左（反時計回り）に少し傾けるのが正解とされる。
-  // 反時計回り（左に傾く）をマイナスの角度とする。
-  // 理想的なお辞儀角度は -35度 〜 -10度 とする。
-  if (angle >= -35 && angle <= -10) {
-    return {
-      isPassed: true,
-      message: '【合格】 課長「うむ、鈴木くん。この左に少し傾いた絶妙なお辞儀角度…実に見事な誠意だ！上司への敬意が痛いほど伝わってくる。これぞ一流の社会人の捺印だな！」',
-    };
-  } else if (angle === 0) {
-    return {
-      isPassed: false,
-      message: '【差し戻し】 課長「なんだねこの直立不動なハンコは！上司に対してペコペコとお辞儀をする気持ちがこれっぽっちも感じられん！態度が硬すぎる、やり直し！」',
-    };
-  } else if (angle > 0) {
-    return {
-      isPassed: false,
-      message: '【差し戻し】 課長「バカ者！ハンコが右にのけぞっているではないか！上司を見下して威嚇しているのか！？あまりに無礼千万、すぐに押し直したまえ！」',
-    };
-  } else {
-    return {
-      isPassed: false,
-      message: '【差し戻し】 課長「鈴木くん、いくら何でも傾けすぎだ。これではお辞儀というより、もはや地面にひれ伏して土下座しているか、転んでいるように見えるぞ。ほどほどにしたまえ。」',
-    };
+export function formatResultHeading(score: MinigameScore): string {
+  if (score === 'excellent') return '🎉 合格（Excellent）！';
+  if (score === 'good') return '🎉 合格（Good）';
+  return '❌ 差し戻し！';
+}
+
+// 課長の評（issue #191の風刺トーンを、汎用スコア（excellent/good/fail）に
+// マッピングする形で維持する）。案件・ルールごとの本格的な文言整備は
+// #202「初期案件コンテンツ整備」で行う想定のため、ここでは最小限のバリエーションに
+// とどめる。
+export function getFlavorMessage(result: RotatingStampResult, rule: Rule): string {
+  if (result.score === 'excellent') {
+    return '課長「うむ、実に見事な捺印だ！上司への敬意が痛いほど伝わってくる。これぞ一流の社会人だな！」';
   }
+  if (result.score === 'good') {
+    return '課長「まあ、及第点というやつだな。もう少し研ぎ澄ませば一流に近づくだろう。」';
+  }
+  const target = rule.target ?? 0;
+  if (result.actual > target) {
+    return '課長「バカ者！上司への敬意が感じられんぞ！あまりに不誠実だ、すぐに押し直したまえ！」';
+  }
+  return '課長「いくら何でもやりすぎだ。ほどほどにしたまえ。」';
 }
