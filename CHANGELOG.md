@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.11.2...v1.12.0) (2026-09-08)
+
+
+### Features
+
+* **minigame:** 捺印ミニゲームを2種追加し備品購入申請案件を実装する ([#290](https://github.com/bamiyanapp/hanko-master-kentei/issues/290)) ([ea18205](https://github.com/bamiyanapp/hanko-master-kentei/commit/ea18205dc3dc328b536725c627ee63db6158894c))
+
 ## [1.11.2](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.11.1...v1.11.2) (2026-09-08)
 
 
