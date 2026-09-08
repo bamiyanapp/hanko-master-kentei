@@ -9,21 +9,21 @@ import type { Scenario } from '@/types/scenario';
 import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
 import ApplicationStageFlow from '@/components/ApplicationStageFlow';
 import { METRIC_NAMES, type JudgementResult } from '@/lib/judgement';
+import { RANK_NAMES, getProgress, recordScenarioClear, type Progress } from '@/lib/rank';
 
 type Screen = 'top' | 'selection' | 'game' | 'result';
 
-// 現在ランク・認定スコア・案件クリア状況は、昇格ランクシステム（#199）で
-// 実装される永続化の仕組みに依存するため、MVPのトップ画面・案件選択画面
-// （#193）では固定値のプレースホルダーとする。
-const RANK_NAMES = ['見習い', '初級', '中級', '上級', '師範', 'ハンコマスター'];
-const CURRENT_RANK = 0;
-const CERTIFICATION_SCORE = 0;
-const CLEARED_SCENARIO_IDS: string[] = [];
+const INITIAL_PROGRESS: Progress = { rankIndex: 0, points: 0, clearedScenarioIds: [] };
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('top');
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [scenarioResult, setScenarioResult] = useState<JudgementResult | null>(null);
+  // 現在ランク・実績ポイント・案件クリア状況は昇格ランクシステム（#199）が
+  // localStorageへ永続化する。SSR時・マウント直後はプレースホルダーの初期値
+  // （見習い・0点・未クリア）を表示し、マウント後のuseEffectで実際の保存内容へ
+  // 差し替える（ブラウザAPIに依存するため、既存のURL復元と同じパターン）。
+  const [progress, setProgress] = useState<Progress>(INITIAL_PROGRESS);
 
   // URLパラメータと状態の同期用関数。ApplicationStageFlow内部のステージ・
   // ルール進行状況はコンポーネント自身が状態を持つ設計（#194）のため、
@@ -62,6 +62,11 @@ export default function Home() {
     }
   }, []);
 
+  // マウント時にlocalStorageから昇格ランク・実績ポイント・クリア済み案件を復元
+  useEffect(() => {
+    setProgress(getProgress());
+  }, []);
+
   const handleGoToSelection = () => {
     playClickSound();
     setScreen('selection');
@@ -91,6 +96,9 @@ export default function Home() {
     updateUrl('result', selectedScenario?.id ?? null);
     if (result.passed) {
       playSuccessSound();
+      if (selectedScenario) {
+        setProgress(recordScenarioClear(selectedScenario.id, result));
+      }
     } else {
       playFailureSound();
     }
@@ -108,8 +116,8 @@ export default function Home() {
     return (
       <ScenarioSelectionScreen
         scenarios={scenarios}
-        currentRank={CURRENT_RANK}
-        clearedScenarioIds={CLEARED_SCENARIO_IDS}
+        currentRank={progress.rankIndex}
+        clearedScenarioIds={progress.clearedScenarioIds}
         onSelect={handleSelectScenario}
         onBack={handleBackToTop}
       />
@@ -188,10 +196,10 @@ export default function Home() {
 
         <div className="d-flex justify-content-center gap-4 mt-4 small text-secondary">
           <span>
-            現在の階級: <strong className="text-body">{RANK_NAMES[CURRENT_RANK]}</strong>
+            現在の階級: <strong className="text-body">{RANK_NAMES[progress.rankIndex]}</strong>
           </span>
           <span>
-            認定スコア: <strong className="text-body">{CERTIFICATION_SCORE}点</strong>
+            認定スコア: <strong className="text-body">{progress.points}点</strong>
           </span>
         </div>
 
