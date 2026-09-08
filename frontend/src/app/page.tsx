@@ -8,10 +8,12 @@ import { scenarios, getScenarioById } from '@/data/scenarios';
 import type { Scenario } from '@/types/scenario';
 import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
 import ApplicationStageFlow from '@/components/ApplicationStageFlow';
-import { METRIC_NAMES, type JudgementResult } from '@/lib/judgement';
+import EndingSequence from '@/components/EndingSequence';
+import ScenarioResultScreen from '@/components/ScenarioResultScreen';
+import type { JudgementResult } from '@/lib/judgement';
 import { RANK_NAMES, getProgress, recordScenarioClear, type Progress } from '@/lib/rank';
 
-type Screen = 'top' | 'selection' | 'game' | 'result';
+type Screen = 'top' | 'selection' | 'game' | 'result' | 'ending';
 
 const INITIAL_PROGRESS: Progress = { rankIndex: 0, points: 0, clearedScenarioIds: [] };
 
@@ -121,6 +123,16 @@ export default function Home() {
     updateUrl('top', null);
   };
 
+  const handleShowEnding = () => {
+    playClickSound();
+    setScreen('ending');
+    updateUrl('ending', null);
+  };
+
+  if (screen === 'ending') {
+    return <EndingSequence onFinish={handleBackToTop} />;
+  }
+
   if (screen === 'selection') {
     return (
       <ScenarioSelectionScreen
@@ -152,49 +164,13 @@ export default function Home() {
 
   if (screen === 'result' && scenarioResult && selectedScenario) {
     return (
-      <main className="d-flex min-vh-100 flex-column align-items-center justify-content-center p-4 p-md-5 bg-light">
-        <div className="card w-100 shadow-sm" style={{ maxWidth: '42rem' }}>
-          <div className="card-body p-4">
-            <h2 className="fs-4 fw-bold mb-3">{selectedScenario.title}：案件クリア</h2>
-
-            {rankUpTo !== null && (
-              <div className="alert alert-warning mb-4">
-                <h3 className="alert-heading fs-6 fw-bold mb-0">
-                  🎊 昇格！ 「{RANK_NAMES[rankUpTo]}」に認定されました
-                </h3>
-              </div>
-            )}
-
-            <div className={`alert ${scenarioResult.passed ? 'alert-success' : 'alert-danger'} mb-4`}>
-              <h3 className="alert-heading fs-6 fw-bold mb-1">
-                {scenarioResult.passed ? '🎉 承認されました！' : '❌ 差し戻されました'}（総合スコア
-                {scenarioResult.overallScore}点）
-              </h3>
-              <p className="small mb-0">{scenarioResult.comment}</p>
-            </div>
-
-            <div className="row row-cols-2 g-3 mb-4">
-              {METRIC_NAMES.map((metric) => (
-                <div key={metric} className="col">
-                  <div className="border rounded p-2 text-center">
-                    <div className="small text-secondary">{metric}</div>
-                    <div className="fs-5 fw-bold">
-                      {scenarioResult.metricScores[metric] ?? '－'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={handleGoToSelection}
-              className="btn btn-success w-100 py-2 fw-bold shadow-sm"
-            >
-              案件選択へ戻る
-            </button>
-          </div>
-        </div>
-      </main>
+      <ScenarioResultScreen
+        scenario={selectedScenario}
+        result={scenarioResult}
+        rankUpTo={rankUpTo}
+        onBackToSelection={handleGoToSelection}
+        onShowEnding={handleShowEnding}
+      />
     );
   }
 
