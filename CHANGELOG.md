@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.7.0...v1.8.0) (2026-09-08)
+
+
+### Features
+
+* **rank:** 昇格・ランクシステム（見習い〜ハンコマスター）を実装する ([#284](https://github.com/bamiyanapp/hanko-master-kentei/issues/284)) ([1a8a905](https://github.com/bamiyanapp/hanko-master-kentei/commit/1a8a9055fe70587f861ad5bb0d0d3954e2733c53))
+
 # [1.7.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.6.0...v1.7.0) (2026-09-08)
 
 
