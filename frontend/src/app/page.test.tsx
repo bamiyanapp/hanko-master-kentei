@@ -4,7 +4,10 @@ import Home from './page';
 import React from 'react';
 import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
 import ApplicationStageFlow from '@/components/ApplicationStageFlow';
+import ScenarioResultScreen from '@/components/ScenarioResultScreen';
+import EndingSequence from '@/components/EndingSequence';
 import { scenarios, pcPurchaseScenario } from '@/data/scenarios';
+import { RANK_NAMES } from '@/lib/rank';
 
 // window オブジェクトのモック
 const mockPushState = vi.fn();
@@ -261,7 +264,7 @@ describe('Home Component Integration', () => {
     expect(stateSetters[3]).not.toHaveBeenCalled(); // setProgressは呼ばれない
   });
 
-  it('should render the result screen with metric scores and pass state', () => {
+  it('should render ScenarioResultScreen with correct props when screen is result', () => {
     const judgement = {
       overallScore: 90,
       metricScores: { 格式: null, 礼節: 90, 誠意: null, 精密性: 80 },
@@ -277,54 +280,51 @@ describe('Home Component Integration', () => {
     ];
 
     useStateCallCount = 0;
-    const result = Home() as React.ReactElement;
+    const result = Home() as React.ReactElement<any>;
 
-    expect(findByText(result, '承認されました')).toBeDefined();
-    expect(findByText(result, 'おおむね問題ありません。')).toBeDefined();
-    expect(findByText(result, '昇格')).toBeUndefined(); // rankUpTo=nullなので昇格演出は出ない
+    expect(result.type).toBe(ScenarioResultScreen);
+    expect(result.props.scenario).toBe(pcPurchaseScenario);
+    expect(result.props.result).toBe(judgement);
+    expect(result.props.rankUpTo).toBeNull();
 
-    const backButton = findByText(result, '案件選択へ戻る');
-    expect(backButton).toBeDefined();
-    backButton.props.onClick();
+    result.props.onBackToSelection();
     expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
     expect(stateSetters[4]).toHaveBeenCalledWith(null); // setRankUpTo(null)
   });
 
-  it('should render the rank-up banner on the result screen when rankUpTo is set', () => {
+  it('should pass rankUpTo through to ScenarioResultScreen and wire onShowEnding to the ending screen', () => {
     const judgement = {
-      overallScore: 90,
-      metricScores: { 格式: null, 礼節: 90, 誠意: null, 精密性: 80 },
+      overallScore: 100,
+      metricScores: { 格式: null, 礼節: 100, 誠意: null, 精密性: 100 },
       passed: true,
-      comment: 'おおむね問題ありません。',
+      comment: '非常に模範的な捺印です。文句のつけようがありません。',
     };
+    const maxRankIndex = RANK_NAMES.length - 1;
     stateValues = [
       'result',
       pcPurchaseScenario,
       judgement,
-      { rankIndex: 1, points: 19, clearedScenarioIds: [pcPurchaseScenario.id] },
-      1,
+      { rankIndex: maxRankIndex, points: 999, clearedScenarioIds: [pcPurchaseScenario.id] },
+      maxRankIndex,
     ];
 
     useStateCallCount = 0;
-    const result = Home() as React.ReactElement;
+    const result = Home() as React.ReactElement<any>;
 
-    const banner = findByText(result, '昇格');
-    expect(banner).toBeDefined();
-    expect(findByText(result, '初級')).toBeDefined();
+    expect(result.props.rankUpTo).toBe(maxRankIndex);
+
+    result.props.onShowEnding();
+    expect(stateSetters[0]).toHaveBeenCalledWith('ending'); // setScreen('ending')
   });
 
-  it('should render the result screen with a failure heading when not passed', () => {
-    const judgement = {
-      overallScore: 30,
-      metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
-      passed: false,
-      comment: '残念ながら基準を満たしていません。再提出をお願いします。',
-    };
-    stateValues = ['result', pcPurchaseScenario, judgement, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
+  it('should render EndingSequence when screen is ending and wire onFinish back to top', () => {
+    stateValues = ['ending', pcPurchaseScenario, null, { rankIndex: 5, points: 999, clearedScenarioIds: [] }, 5];
 
     useStateCallCount = 0;
-    const result = Home() as React.ReactElement;
+    const result = Home() as React.ReactElement<any>;
 
-    expect(findByText(result, '差し戻されました')).toBeDefined();
+    expect(result.type).toBe(EndingSequence);
+    result.props.onFinish();
+    expect(stateSetters[0]).toHaveBeenCalledWith('top'); // setScreen('top')
   });
 });
