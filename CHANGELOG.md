@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.8.0...v1.9.0) (2026-09-08)
+
+
+### Features
+
+* **result:** 結果画面に昇格判定の演出を追加する ([#285](https://github.com/bamiyanapp/hanko-master-kentei/issues/285)) ([cdfe15b](https://github.com/bamiyanapp/hanko-master-kentei/commit/cdfe15b002f81956263723477fcdc8d6b13546c0))
+
 # [1.8.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.7.0...v1.8.0) (2026-09-08)
 
 
