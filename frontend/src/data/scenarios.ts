@@ -328,12 +328,340 @@ export const officeSuppliesScenario: Scenario = {
   ],
 };
 
+// 「交通費精算」案件（issue #205、Phase 2）。#191「案件ごとのテーマ」表の
+// 風刺対象は「細かすぎるルール」。requiredRank: 1とし、出張申請と同時期に
+// 挑戦できる案件とした。
+export const travelExpenseScenario: Scenario = {
+  id: 'travel-expense',
+  title: '交通費精算',
+  description:
+    '客先訪問にかかった電車代380円を精算したい。金額はごくわずかだが、1円単位の正確さが求められる。',
+  requiredRank: 1,
+  stages: [
+    {
+      id: 'travel-expense-kito',
+      type: 'kito',
+      rules: [
+        {
+          id: 'kito-fare-position',
+          description:
+            '運賃表の該当区間欄からずれないよう、ちょうど基準位置に捺印すること。',
+          type: 'position',
+          difficulty: 1,
+          target: 0.3,
+          tolerance: 0.3,
+        },
+      ],
+    },
+    {
+      id: 'travel-expense-saikan',
+      type: 'saikan',
+      rules: [
+        {
+          id: 'saikan-fare-position',
+          description: '起票時と同じ位置を維持して再捺印すること。許容誤差はさらに狭まる。',
+          type: 'position',
+          difficulty: 2,
+          target: 0.3,
+          tolerance: 0.2,
+        },
+        {
+          id: 'saikan-fare-timing',
+          description:
+            '1円単位の精算には0.5秒という「正確さの押印速度」が存在するとされる。速すぎても遅すぎても「概算で済ませようとしている」と判定される。',
+          type: 'timing',
+          difficulty: 2,
+          target: 0.5,
+          tolerance: 0.12,
+        },
+      ],
+    },
+    {
+      id: 'travel-expense-kenetsu',
+      type: 'kenetsu',
+      rules: [
+        {
+          id: 'kenetsu-fare-position',
+          description: '正確な位置は引き続き維持すること。検閲では許容誤差がさらに狭まる。',
+          type: 'position',
+          difficulty: 3,
+          target: 0.3,
+          tolerance: 0.12,
+        },
+        {
+          id: 'kenetsu-fare-pressure',
+          description:
+              '380円という半端な金額への「几帳面さ」を印影の濃さで示すこと。薄すぎると「どんぶり勘定」、濃すぎると「神経質」と判定される。',
+          type: 'pressure',
+          difficulty: 3,
+          target: 0.5,
+          tolerance: 0.15,
+        },
+        {
+          id: 'kenetsu-receipt-manner',
+          description:
+            '領収書の折り目の数と、電車の乗換回数が一致していることを確認した上で捺印すること（一致していない場合の対処法は誰も知らない）。',
+          type: 'custom',
+          difficulty: 5,
+        },
+      ],
+    },
+  ],
+};
+
+// 「テレワーク申請」案件（issue #205、Phase 2）。#191「案件ごとのテーマ」表の
+// 風刺対象は「出社信仰」。requiredRank: 3（上級以上）とし、上級以降で
+// 解放される最初の案件とした。
+export const teleworkScenario: Scenario = {
+  id: 'telework',
+  title: 'テレワーク申請',
+  description:
+    '体調不良のため、明日1日だけ自宅で勤務したい。制度上は届出のみで可能なはずだが、実際には相応の作法が求められる。',
+  requiredRank: 3,
+  stages: [
+    {
+      id: 'telework-kito',
+      type: 'kito',
+      rules: [
+        {
+          id: 'kito-remote-angle',
+          description:
+            '出社しないことへの引け目を示すため、通常よりも深いお辞儀ハンコで捺印すること。',
+          type: 'angle',
+          difficulty: 2,
+          target: -40,
+          tolerance: 15,
+        },
+      ],
+    },
+    {
+      id: 'telework-saikan',
+      type: 'saikan',
+      rules: [
+        {
+          id: 'saikan-remote-angle',
+          description: '起票時と同じ、深いお辞儀角度を維持して再捺印すること。',
+          type: 'angle',
+          difficulty: 3,
+          target: -40,
+          tolerance: 12,
+        },
+        {
+          id: 'saikan-remote-tap',
+          description:
+            '画面内を移動する印鑑を、上司が「まだ出社していないか」と気にし始める直前のタイミングで捺印すること。早すぎると「機先を制しすぎ」、遅すぎると「危機感が無い」と判定される。',
+          type: 'moving-tap',
+          difficulty: 3,
+          target: 40,
+          tolerance: 10,
+        },
+      ],
+    },
+    {
+      id: 'telework-kenetsu',
+      type: 'kenetsu',
+      rules: [
+        {
+          id: 'kenetsu-remote-angle',
+          description: '深いお辞儀角度は引き続き維持すること。検閲では許容誤差がさらに狭まる。',
+          type: 'angle',
+          difficulty: 4,
+          target: -40,
+          tolerance: 8,
+        },
+        {
+          id: 'kenetsu-remote-position',
+          description:
+            '出社している同僚全員分の印影から均等に距離を取り、「浮いていない」ことを座標で示すこと。',
+          type: 'position',
+          difficulty: 4,
+          target: 0.9,
+          tolerance: 0.25,
+        },
+        {
+          id: 'kenetsu-attendance-manner',
+          description:
+            '自宅の椅子がオフィスの椅子と同じ硬さであることを自己申告した上で捺印すること（測定方法・基準は非公開）。',
+          type: 'custom',
+          difficulty: 5,
+        },
+      ],
+    },
+  ],
+};
+
+// 「接待交際費」案件（issue #205、Phase 2）。#191「案件ごとのテーマ」表の
+// 風刺対象は「過剰な形式」。tiltルール（お辞儀捺印）を中心に構成し、
+// 「形式への傾倒」というテーマを角度そのもので表現した。requiredRank: 4。
+export const entertainmentExpenseScenario: Scenario = {
+  id: 'entertainment-expense',
+  title: '接待交際費',
+  description:
+    '取引先との会食にかかった費用を計上したい。金額自体は規程内だが、接待という行為の性質上、通常以上の形式美が求められる。',
+  requiredRank: 4,
+  stages: [
+    {
+      id: 'entertainment-expense-kito',
+      type: 'kito',
+      rules: [
+        {
+          id: 'kito-hospitality-tilt',
+          description:
+            '取引先への敬意を最大限に示すため、印影を深く傾けて捺印すること。',
+          type: 'tilt',
+          difficulty: 3,
+          target: 30,
+          tolerance: 10,
+        },
+      ],
+    },
+    {
+      id: 'entertainment-expense-saikan',
+      type: 'saikan',
+      rules: [
+        {
+          id: 'saikan-hospitality-tilt',
+          description: '起票時と同じ深い傾きを維持して再捺印すること。',
+          type: 'tilt',
+          difficulty: 4,
+          target: 30,
+          tolerance: 8,
+        },
+        {
+          id: 'saikan-hospitality-timing',
+          description:
+            '接待の格式に見合った押印速度（1.5秒）が求められる。速すぎると「事務的すぎる」、遅すぎると「未練がましい」と判定される。',
+          type: 'timing',
+          difficulty: 4,
+          target: 1.5,
+          tolerance: 0.2,
+        },
+      ],
+    },
+    {
+      id: 'entertainment-expense-kenetsu',
+      type: 'kenetsu',
+      rules: [
+        {
+          id: 'kenetsu-hospitality-tilt',
+          description: '深い傾きは引き続き維持すること。検閲では許容誤差がさらに狭まる。',
+          type: 'tilt',
+          difficulty: 5,
+          target: 30,
+          tolerance: 5,
+        },
+        {
+          id: 'kenetsu-hospitality-pressure',
+          description:
+            '相手への「誠意」を印影の濃さで示すこと。薄すぎると「儀礼的」、濃すぎると「下心が見える」と判定される。',
+          type: 'pressure',
+          difficulty: 5,
+          target: 0.7,
+          tolerance: 0.15,
+        },
+        {
+          id: 'kenetsu-hospitality-manner',
+          description:
+            '会食した店の暖簾をくぐった回数と、印鑑を押し直した回数が同数であることを確認した上で捺印すること（初回で成功した場合の扱いは規定されていない）。',
+          type: 'custom',
+          difficulty: 5,
+        },
+      ],
+    },
+  ],
+};
+
+// 「新規サービス導入」案件（issue #205、Phase 2）。#191「案件ごとのテーマ」表の
+// 風刺対象は「根回し・合意形成」。requiredRank: 5（最高ランク「ハンコマスター」）
+// とし、全案件中もっとも遅く解放される最終案件とした。
+export const newServiceScenario: Scenario = {
+  id: 'new-service',
+  title: '新規サービス導入',
+  description:
+    '業務効率化のため、新しいSaaSツールの導入を提案したい。内容自体は誰も反対しないはずだが、決裁に至るまでの「根回し」の作法が最も複雑とされる。',
+  requiredRank: 5,
+  stages: [
+    {
+      id: 'new-service-kito',
+      type: 'kito',
+      rules: [
+        {
+          id: 'kito-consensus-angle',
+          description:
+            '関係者全員への事前説明を済ませた体で、慎重かつ丁寧な角度で捺印すること。',
+          type: 'angle',
+          difficulty: 3,
+          target: -30,
+          tolerance: 10,
+        },
+      ],
+    },
+    {
+      id: 'new-service-saikan',
+      type: 'saikan',
+      rules: [
+        {
+          id: 'saikan-consensus-angle',
+          description: '起票時と同じ、慎重な角度を維持して再捺印すること。',
+          type: 'angle',
+          difficulty: 4,
+          target: -30,
+          tolerance: 8,
+        },
+        {
+          id: 'saikan-consensus-tap',
+          description:
+            '画面内を移動する印鑑を、全関係者の合意が揃った瞬間（画面中央）で捺印すること。早すぎると「独断専行」、遅すぎると「決断力不足」と判定される。',
+          type: 'moving-tap',
+          difficulty: 4,
+          target: 50,
+          tolerance: 8,
+        },
+      ],
+    },
+    {
+      id: 'new-service-kenetsu',
+      type: 'kenetsu',
+      rules: [
+        {
+          id: 'kenetsu-consensus-angle',
+          description: '慎重な角度は引き続き維持すること。検閲では許容誤差がさらに狭まる。',
+          type: 'angle',
+          difficulty: 5,
+          target: -30,
+          tolerance: 5,
+        },
+        {
+          id: 'kenetsu-consensus-position',
+          description:
+            '関係する全部署の印影から等距離になるよう配置し、「特定の部署に肩入れしていない」ことを座標で示すこと。',
+          type: 'position',
+          difficulty: 5,
+          target: 1.2,
+          tolerance: 0.3,
+        },
+        {
+          id: 'kenetsu-nemawashi-manner',
+          description:
+            '本件について過去に交わされた雑談・立ち話・廊下ですれ違った際の会釈のすべてを「事前調整」として計上した上で捺印すること（集計方法は担当者の記憶に依存する）。',
+          type: 'custom',
+          difficulty: 5,
+        },
+      ],
+    },
+  ],
+};
+
 // 案件（シナリオ）一覧。新しい案件を追加する場合はここに追加するだけでよい。
 export const scenarios: Scenario[] = [
   pcPurchaseScenario,
   paidLeaveScenario,
   businessTripScenario,
+  travelExpenseScenario,
   officeSuppliesScenario,
+  teleworkScenario,
+  entertainmentExpenseScenario,
+  newServiceScenario,
 ];
 
 export function getScenarioById(id: string): Scenario | undefined {
