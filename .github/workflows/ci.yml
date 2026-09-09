@@ -18,5 +18,7 @@ jobs:
       duplication_threshold: 5
       coverage_threshold: 70
       enable_standards_check: true
+      enable_mermaid_render: true
+      mermaid_doc_paths: "docs/architecture.md"
     secrets:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}

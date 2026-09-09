@@ -27,6 +27,10 @@
 - `Stages`: ステージID、タイトル、判定基準、差し戻しメッセージ集
 
 ## 4. インフラ構成図 (イメージ)
+
+<details>
+<summary>ソースを表示（mermaid記法）</summary>
+
 ```mermaid
 graph TD
     User[User Browser] --> Frontend[Next.js / Vercel or S3+CloudFront]
@@ -35,6 +39,12 @@ graph TD
     Lambda --> DynamoDB[(Amazon DynamoDB)]
     Lambda --> AI[OpenAI/Gemini API]
 ```
+
+上記の```mermaid```ブロックはPR差分ビュー・API経由でのファイル取得等ではテキストのまま表示され図として確認できない（[bamiyanapp/karuta#824](https://github.com/bamiyanapp/karuta/issues/824)）。ソース（mermaid記法）はこのまま維持しつつ、下記は`enable_mermaid_render`（`render-mermaid-diagrams` job）が`main`へのマージのたびに再レンダリングし、`docs-diagrams`ブランチの`latest/`へ上書き公開している画像（常に最新版）。
+
+</details>
+
+![Architecture (rendered)](https://raw.githubusercontent.com/bamiyanapp/hanko-master-kentei/docs-diagrams/latest/architecture.png)
 
 ## 5. デプロイフロー
 1. OSLS (`osls deploy`) により AWS リソース（Lambda, API Gateway, DynamoDB）を構築。
