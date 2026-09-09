@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.12.0...v1.13.0) (2026-09-09)
+
+
+### Features
+
+* **content:** 残り4案件（交通費精算・テレワーク・接待交際費・新規サービス導入）を追加する ([#294](https://github.com/bamiyanapp/hanko-master-kentei/issues/294)) ([0b7c0ff](https://github.com/bamiyanapp/hanko-master-kentei/commit/0b7c0ff7905b0f59b825cac8934d36a93ade2aec))
+
 # [1.12.0](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.11.2...v1.12.0) (2026-09-08)
 
 
