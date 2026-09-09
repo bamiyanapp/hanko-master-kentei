@@ -4,6 +4,10 @@ import {
   pcPurchaseScenario,
   paidLeaveScenario,
   officeSuppliesScenario,
+  travelExpenseScenario,
+  teleworkScenario,
+  entertainmentExpenseScenario,
+  newServiceScenario,
   getScenarioById,
 } from './scenarios';
 
@@ -70,7 +74,15 @@ describe('scenarios', () => {
     expect(getScenarioById('pc-purchase')).toBe(pcPurchaseScenario);
     expect(getScenarioById('paid-leave')).toBe(paidLeaveScenario);
     expect(getScenarioById('office-supplies')).toBe(officeSuppliesScenario);
+    expect(getScenarioById('travel-expense')).toBe(travelExpenseScenario);
+    expect(getScenarioById('telework')).toBe(teleworkScenario);
+    expect(getScenarioById('entertainment-expense')).toBe(entertainmentExpenseScenario);
+    expect(getScenarioById('new-service')).toBe(newServiceScenario);
     expect(getScenarioById('not-exist')).toBeUndefined();
+  });
+
+  it('issue #191「案件ごとのテーマ」表に掲載された全8案件が実装されている', () => {
+    expect(scenarios.length).toBe(8);
   });
 
   it('requiredRankが0の案件が最低1件あり、初期状態から遊べる', () => {
