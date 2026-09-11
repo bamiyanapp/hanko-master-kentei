@@ -1,6 +1,6 @@
 {
   "name": "hanko-master-kentei",
-  "version": "1.13.2",
+  "version": "1.13.3",
   "private": true,
   "workspaces": [
     "frontend",

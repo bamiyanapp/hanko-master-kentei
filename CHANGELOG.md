@@ -1,3 +1,10 @@
+## [1.13.3](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.2...v1.13.3) (2026-09-11)
+
+
+### Bug Fixes
+
+* **pwa:** マスカブルアイコン(maskable-icon-512.png)が下寄りのまま取り残されていたのを修正 ([#307](https://github.com/bamiyanapp/hanko-master-kentei/issues/307)) ([e092576](https://github.com/bamiyanapp/hanko-master-kentei/commit/e09257650626ce4346ecb5c03fea22f0c7b49b3b))
+
 ## [1.13.2](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.1...v1.13.2) (2026-09-11)
 
 
