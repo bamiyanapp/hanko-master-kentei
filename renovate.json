@@ -4,6 +4,7 @@
   "git-submodules": {
     "enabled": true
   },
+  "rebaseWhen": "behind-base-branch",
   "packageRules": [
     {
       "matchPackageNames": ["typescript"],
