@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   ci:
-    uses: bamiyanapp/dev-standards/.github/workflows/reusable-ci.yml@v2.28.0
+    uses: bamiyanapp/dev-standards/.github/workflows/reusable-ci.yml@c47497ffd8bf4ada388bd5cbef1d4c9eed19ec7a
     with:
       node_version: "24"
       workspaces: true
