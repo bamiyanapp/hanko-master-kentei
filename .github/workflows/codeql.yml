@@ -11,4 +11,4 @@ on:
 
 jobs:
   codeql:
-    uses: bamiyanapp/dev-standards/.github/workflows/reusable-codeql.yml@c47497ffd8bf4ada388bd5cbef1d4c9eed19ec7a
+    uses: bamiyanapp/dev-standards/.github/workflows/reusable-codeql.yml@v2.28.1
