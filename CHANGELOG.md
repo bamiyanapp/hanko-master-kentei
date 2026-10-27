@@ -1,3 +1,10 @@
+## [1.13.9](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.8...v1.13.9) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** update react monorepo to v19.3.1 ([242af5b](https://github.com/bamiyanapp/hanko-master-kentei/commit/242af5b8539fbad639dc2038a8dd357d9c41334a))
+
 ## [1.13.8](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.7...v1.13.8) (2026-10-27)
 
 
