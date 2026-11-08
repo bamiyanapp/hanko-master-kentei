@@ -1,3 +1,10 @@
+## [1.13.10](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.9...v1.13.10) (2026-11-08)
+
+
+### Bug Fixes
+
+* **ci:** ci.yml・codeql.ymlのpermissions不足でCIが起動しない問題を修正する ([#392](https://github.com/bamiyanapp/hanko-master-kentei/issues/392)) ([ea03c05](https://github.com/bamiyanapp/hanko-master-kentei/commit/ea03c050b0db69ce8d7a945cef6a042f5feabfc4)), closes [#391](https://github.com/bamiyanapp/hanko-master-kentei/issues/391) [#391](https://github.com/bamiyanapp/hanko-master-kentei/issues/391)
+
 ## [1.13.9](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.8...v1.13.9) (2026-10-27)
 
 
