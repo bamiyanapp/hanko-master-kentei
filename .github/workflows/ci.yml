@@ -7,11 +7,20 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # reusable-ci.ymlのdependency-risk-summary job（issue #391）が要求する権限。
+  # enable_dependency_risk_summaryが未設定（既定false）で実際には実行されない
+  # jobでも、GitHub Actionsはif:の評価結果に関わらずjob定義のpermissionsを
+  # 静的にチェックするため、これが無いとワークフロー全体がstartup_failureになる
+  issues: write
 
 jobs:
   ci:
     uses: bamiyanapp/dev-standards/.github/workflows/reusable-ci.yml@v2.114.1
     with:
+      # uses:行と同じdev-standardsバージョンを指定する必須入力（issue #391で発覚。
+      # dev-standards#1071で導入されv2.114.1時点ではrequired: trueだったため、
+      # 未指定のままだとstartup_failureになる）
+      self_ref: v2.114.1
       node_version: "24"
       workspaces: true
       enable_duplication_check: true

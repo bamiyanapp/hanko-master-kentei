@@ -9,6 +9,14 @@ on:
   schedule:
     - cron: "0 0 * * 1"
 
+# reusable-codeql.ymlのanalyze jobが要求する権限（docs/code-quality-conventions.md
+# 「CodeQL」節）。省略するとリポジトリ既定のGITHUB_TOKEN権限が上限になり、
+# startup_failure（issue #391）になる
+permissions:
+  security-events: write
+  actions: read
+  contents: read
+
 jobs:
   codeql:
     uses: bamiyanapp/dev-standards/.github/workflows/reusable-codeql.yml@v2.114.1
