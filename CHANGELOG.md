@@ -1,3 +1,10 @@
+## [1.13.12](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.11...v1.13.12) (2026-11-10)
+
+
+### Bug Fixes
+
+* **deps:** update nextjs monorepo to v16.4.6 ([#395](https://github.com/bamiyanapp/hanko-master-kentei/issues/395)) ([7291878](https://github.com/bamiyanapp/hanko-master-kentei/commit/7291878ca5828d585b9a4f29f5fc81f3dc458bb3))
+
 ## [1.13.11](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.10...v1.13.11) (2026-11-08)
 
 
