@@ -1,3 +1,10 @@
+## [1.13.13](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.12...v1.13.13) (2026-11-11)
+
+
+### Bug Fixes
+
+* **deps:** update dependency bootstrap to v5.3.9 ([#398](https://github.com/bamiyanapp/hanko-master-kentei/issues/398)) ([faa30f4](https://github.com/bamiyanapp/hanko-master-kentei/commit/faa30f4a9282d43cc4e2dc87f822b07ea2ab6757))
+
 ## [1.13.12](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.11...v1.13.12) (2026-11-10)
 
 
