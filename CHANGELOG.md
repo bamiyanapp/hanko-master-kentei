@@ -1,3 +1,10 @@
+## [1.13.14](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.13...v1.13.14) (2026-11-13)
+
+
+### Bug Fixes
+
+* self_refをuses:と同じv2.123.0に合わせる ([#404](https://github.com/bamiyanapp/hanko-master-kentei/issues/404)) ([3712bda](https://github.com/bamiyanapp/hanko-master-kentei/commit/3712bda894d7c261baeffe5e170dfb4c34d42d6b))
+
 ## [1.13.13](https://github.com/bamiyanapp/hanko-master-kentei/compare/v1.13.12...v1.13.13) (2026-11-11)
 
 
