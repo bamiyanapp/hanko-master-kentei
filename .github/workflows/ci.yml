@@ -20,7 +20,7 @@ jobs:
       # uses:行と同じdev-standardsバージョンを指定する必須入力（issue #391で発覚。
       # dev-standards#1071で導入されv2.114.1時点ではrequired: trueだったため、
       # 未指定のままだとstartup_failureになる）
-      self_ref: v2.114.1
+      self_ref: v2.123.0
       node_version: "24"
       workspaces: true
       enable_duplication_check: true
