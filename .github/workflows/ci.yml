@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   ci:
-    uses: bamiyanapp/dev-standards/.github/workflows/reusable-ci.yml@v2.123.1
+    uses: bamiyanapp/dev-standards/.github/workflows/reusable-ci.yml@v2.123.2
     with:
       # uses:行と同じdev-standardsバージョンを指定する必須入力（issue #391で発覚。
       # dev-standards#1071で導入されv2.114.1時点ではrequired: trueだったため、
