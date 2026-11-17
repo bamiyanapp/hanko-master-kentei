@@ -1,37 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ScenarioResultScreen from './ScenarioResultScreen';
 import { pcPurchaseScenario } from '@/data/scenarios';
 import type { JudgementResult } from '@/lib/judgement';
 import { RANK_NAMES } from '@/lib/rank';
-
-function getElementText(element: any): string {
-  if (!element) return '';
-  if (typeof element === 'string') return element;
-  if (typeof element === 'number') return String(element);
-  if (Array.isArray(element)) return element.map(getElementText).join('');
-  if (element.props && element.props.children) return getElementText(element.props.children);
-  return '';
-}
-
-function findByText(element: any, text: string): any {
-  if (!element) return undefined;
-  if (typeof element === 'string' || typeof element === 'number') return undefined;
-  const elementText = getElementText(element);
-  if (elementText.includes(text)) {
-    if (element.props && element.props.children) {
-      const children = Array.isArray(element.props.children)
-        ? element.props.children
-        : [element.props.children];
-      for (const child of children) {
-        const found = findByText(child, text);
-        if (found) return found;
-      }
-    }
-    return element;
-  }
-  return undefined;
-}
 
 const baseResult: JudgementResult = {
   overallScore: 90,
@@ -40,76 +13,94 @@ const baseResult: JudgementResult = {
   comment: 'おおむね問題ありません。',
 };
 
+function renderScreen(
+  overrides: Partial<React.ComponentProps<typeof ScenarioResultScreen>> = {},
+) {
+  const onBackToSelection = vi.fn();
+  const onShowEnding = vi.fn();
+  render(
+    <ScenarioResultScreen
+      scenario={pcPurchaseScenario}
+      result={baseResult}
+      rankUpTo={null}
+      onBackToSelection={onBackToSelection}
+      onShowEnding={onShowEnding}
+      {...overrides}
+    />,
+  );
+  return { onBackToSelection, onShowEnding };
+}
+
+// 指標名のラベルが入ったタイル全体（ラベル＋スコア）を取得する
+function metricTile(name: string): HTMLElement {
+  return screen.getByText(name).parentElement as HTMLElement;
+}
+
 describe('ScenarioResultScreen', () => {
-  it('スコア・コメントを表示し、rankUpTo=nullの場合は「案件選択へ戻る」ボタンを表示する', () => {
-    const onBackToSelection = vi.fn();
-    const result = ScenarioResultScreen({
-      scenario: pcPurchaseScenario,
-      result: baseResult,
-      rankUpTo: null,
-      onBackToSelection,
-      onShowEnding: vi.fn(),
-    }) as any;
+  it('案件名・総合スコア・コメントを表示し、昇格なしなら「案件選択へ戻る」で戻る', async () => {
+    const user = userEvent.setup();
+    const { onBackToSelection, onShowEnding } = renderScreen();
 
-    expect(findByText(result, '承認されました')).toBeDefined();
-    expect(findByText(result, 'おおむね問題ありません。')).toBeDefined();
-    expect(findByText(result, '昇格')).toBeUndefined();
+    expect(
+      screen.getByRole('heading', { name: `${pcPurchaseScenario.title}：案件クリア` }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /承認されました.*総合スコア90点/ })).toBeInTheDocument();
+    expect(screen.getByText('おおむね問題ありません。')).toBeInTheDocument();
+    expect(screen.queryByText(/昇格/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'エンディングを見る' })).not.toBeInTheDocument();
 
-    const backButton = findByText(result, '案件選択へ戻る');
-    expect(backButton).toBeDefined();
-    backButton.props.onClick();
+    await user.click(screen.getByRole('button', { name: '案件選択へ戻る' }));
+
     expect(onBackToSelection).toHaveBeenCalledTimes(1);
+    expect(onShowEnding).not.toHaveBeenCalled();
   });
 
-  it('rankUpToが最高ランク未満の場合も「案件選択へ戻る」ボタンを表示する', () => {
-    const result = ScenarioResultScreen({
-      scenario: pcPurchaseScenario,
-      result: baseResult,
-      rankUpTo: 1,
-      onBackToSelection: vi.fn(),
-      onShowEnding: vi.fn(),
-    }) as any;
+  it('4指標のスコアを表示し、未計測の指標は「－」にする', () => {
+    renderScreen();
 
-    expect(findByText(result, '昇格')).toBeDefined();
-    expect(findByText(result, RANK_NAMES[1])).toBeDefined();
-    expect(findByText(result, '案件選択へ戻る')).toBeDefined();
-    expect(findByText(result, 'エンディング')).toBeUndefined();
+    expect(metricTile('礼節')).toHaveTextContent('90');
+    expect(metricTile('精密性')).toHaveTextContent('80');
+    expect(metricTile('格式')).toHaveTextContent('－');
+    expect(metricTile('誠意')).toHaveTextContent('－');
   });
 
-  it('rankUpToが最高ランクの場合は「エンディングを見る」ボタンを表示する', () => {
-    const onShowEnding = vi.fn();
+  it('最高ランク未満への昇格では、昇格表示と「案件選択へ戻る」ボタンを表示する', () => {
+    renderScreen({ rankUpTo: 1 });
+
+    expect(
+      screen.getByRole('heading', { name: new RegExp(`昇格.*「${RANK_NAMES[1]}」に認定`) }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '案件選択へ戻る' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'エンディングを見る' })).not.toBeInTheDocument();
+  });
+
+  it('最高ランクへ昇格した場合は「エンディングを見る」のみ表示し、押すとonShowEndingが呼ばれる', async () => {
+    const user = userEvent.setup();
     const maxRankIndex = RANK_NAMES.length - 1;
-    const result = ScenarioResultScreen({
-      scenario: pcPurchaseScenario,
-      result: baseResult,
-      rankUpTo: maxRankIndex,
-      onBackToSelection: vi.fn(),
-      onShowEnding,
-    }) as any;
+    const { onBackToSelection, onShowEnding } = renderScreen({ rankUpTo: maxRankIndex });
 
-    const endingButton = findByText(result, 'エンディングを見る');
-    expect(endingButton).toBeDefined();
-    endingButton.props.onClick();
+    expect(screen.queryByRole('button', { name: '案件選択へ戻る' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'エンディングを見る' }));
+
     expect(onShowEnding).toHaveBeenCalledTimes(1);
-
-    expect(findByText(result, '案件選択へ戻る')).toBeUndefined();
+    expect(onBackToSelection).not.toHaveBeenCalled();
   });
 
-  it('不合格時は差し戻し表示になる', () => {
-    const failResult: JudgementResult = {
-      overallScore: 30,
-      metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
-      passed: false,
-      comment: '残念ながら基準を満たしていません。再提出をお願いします。',
-    };
-    const result = ScenarioResultScreen({
-      scenario: pcPurchaseScenario,
-      result: failResult,
-      rankUpTo: null,
-      onBackToSelection: vi.fn(),
-      onShowEnding: vi.fn(),
-    }) as any;
+  it('不合格時は差し戻し表示になり、承認の文言は出さない', () => {
+    renderScreen({
+      result: {
+        overallScore: 30,
+        metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
+        passed: false,
+        comment: '残念ながら基準を満たしていません。再提出をお願いします。',
+      },
+    });
 
-    expect(findByText(result, '差し戻されました')).toBeDefined();
+    expect(screen.getByRole('heading', { name: /差し戻されました.*総合スコア30点/ })).toBeInTheDocument();
+    expect(screen.queryByText(/承認されました/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText('残念ながら基準を満たしていません。再提出をお願いします。'),
+    ).toBeInTheDocument();
   });
 });
