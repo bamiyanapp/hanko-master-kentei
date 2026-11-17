@@ -25,7 +25,11 @@ jobs:
       workspaces: true
       enable_duplication_check: true
       duplication_threshold: 5
-      coverage_threshold: 70
+      # 実測値（2026-11-17、Statements 98.96%・Functions 100%・Lines 100%・Branches 94.94%）の
+      # 少し下で固定するラチェット値（issue #415）。branchesは些細な変更で変動しやすく
+      # 脆いため判定から外す（表示は常に全指標）
+      coverage_threshold: 95
+      coverage_metrics: "statements,functions,lines"
       enable_standards_check: true
       enable_mermaid_render: true
       mermaid_doc_paths: "docs/architecture.md"
