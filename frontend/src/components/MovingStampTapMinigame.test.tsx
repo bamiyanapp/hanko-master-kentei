@@ -1,55 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import MovingStampTapMinigame from './MovingStampTapMinigame';
 import type { Rule } from '@/types/scenario';
 
-// RotatingStampMinigame.test.tsxと同じ方針: jsdomを使わず、useState/
-// useEffectをモックしてReact要素ツリーを直接走査する（本コンポーネントの
-// 状態順は moving({position, direction}), stoppedの2つ）。
-let stateValues: any[] = [];
-let stateSetters: any[] = [];
-let useStateCallCount = 0;
-let registeredEffects: (() => void | (() => void))[] = [];
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    useState: (initialValue: any) => {
-      const index = useStateCallCount;
-      useStateCallCount++;
-      if (stateValues[index] === undefined) {
-        stateValues[index] = initialValue;
-      }
-      const setter = (newValue: any) => {
-        if (typeof newValue === 'function') {
-          stateValues[index] = newValue(stateValues[index]);
-        } else {
-          stateValues[index] = newValue;
-        }
-        stateSetters[index](newValue);
-      };
-      return [stateValues[index], setter];
-    },
-    useEffect: (callback: () => void | (() => void)) => {
-      registeredEffects.push(callback);
-    },
-  };
-});
-
-function findAllButtons(element: any, acc: any[] = []): any[] {
-  if (!element) return acc;
-  if (element.type === 'button') acc.push(element);
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      findAllButtons(child, acc);
-    }
-  }
-  return acc;
-}
+// 実装の定数: 60msごとに4%ずつ動き、0〜100%の間を往復する（端で折り返す）。
+// 目標50・許容差10 なので 45〜55=excellent、40〜60=good、それ以外=fail
+const TICK_MS = 60;
 
 const rule: Rule = {
   id: 'test-moving-tap',
@@ -60,121 +17,103 @@ const rule: Rule = {
   tolerance: 10,
 };
 
+function setup() {
+  const onComplete = vi.fn();
+  const user = userEvent.setup();
+  render(<MovingStampTapMinigame rule={rule} onComplete={onComplete} />);
+  return { user, onComplete, button: screen.getByRole('button', { name: 'スタンプ！' }) };
+}
+
+function advanceTicks(ticks: number) {
+  act(() => {
+    vi.advanceTimersByTime(ticks * TICK_MS);
+  });
+}
+
+// 印鑑の現在位置（左端からの%）を読む
+function position(): number {
+  const style = screen.getByText('鈴木').parentElement?.getAttribute('style') ?? '';
+  const match = /left:\s*(-?[\d.]+)%/.exec(style);
+  if (!match) throw new Error('印鑑の位置を読み取れません');
+  return Number(match[1]);
+}
+
 describe('MovingStampTapMinigame', () => {
   beforeEach(() => {
-    useStateCallCount = 0;
-    stateValues = [];
-    stateSetters = [vi.fn(), vi.fn()]; // moving, stopped
-    registeredEffects = [];
+    // setTimeoutまで偽装するとuserEvent内部の待機が進まず固まるため、本コンポーネントが
+    // 使うsetInterval系だけを偽装する
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   });
 
-  it('停止前は「スタンプ！」ボタンが有効で、ルールの説明文を表示する', () => {
-    stateValues = [{ position: 0, direction: 1 }, false];
-    useStateCallCount = 0;
-    const result = MovingStampTapMinigame({ rule, onComplete: vi.fn() }) as any;
-
-    const buttons = findAllButtons(result);
-    expect(buttons.length).toBe(1);
-    expect(buttons[0].props.disabled).toBe(false);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('目標位置ちょうどでタップするとexcellentでonCompleteが呼ばれる', () => {
-    stateValues = [{ position: 50, direction: 1 }, false];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = MovingStampTapMinigame({ rule, onComplete }) as any;
+  it('初期状態は左端(0%)で、ルールの説明文と有効なボタンを表示する', () => {
+    const { button } = setup();
 
-    const [tapButton] = findAllButtons(result);
-    tapButton.props.onClick();
-
-    expect(stateSetters[1]).toHaveBeenCalledWith(true); // setStopped(true)
-    expect(onComplete).toHaveBeenCalledWith({ actual: 50, score: 'excellent' });
+    expect(position()).toBe(0);
+    expect(screen.getByText('テスト用タイミングルール')).toBeInTheDocument();
+    expect(button).toBeEnabled();
   });
 
-  it('目標から大きく外れた位置でタップするとfailでonCompleteが呼ばれる', () => {
-    stateValues = [{ position: 5, direction: 1 }, false];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = MovingStampTapMinigame({ rule, onComplete }) as any;
+  it('時間とともに4%ずつ右へ動き、右端で折り返して戻り、左端でまた折り返す', () => {
+    setup();
 
-    const [tapButton] = findAllButtons(result);
-    tapButton.props.onClick();
+    advanceTicks(1);
+    expect(position()).toBe(4);
 
-    expect(onComplete).toHaveBeenCalledWith({ actual: 5, score: 'fail' });
+    advanceTicks(24);
+    expect(position()).toBe(100); // 右端
+
+    advanceTicks(1);
+    expect(position()).toBe(96); // 折り返して左へ
+
+    advanceTicks(24);
+    expect(position()).toBe(0); // 左端
+
+    advanceTicks(1);
+    expect(position()).toBe(4); // 再び右へ
   });
 
-  it('停止済み（stopped=true）の場合は「スタンプ！」ボタンが無効化される', () => {
-    stateValues = [{ position: 50, direction: 1 }, true];
-    useStateCallCount = 0;
-    const result = MovingStampTapMinigame({ rule, onComplete: vi.fn() }) as any;
+  it.each([
+    { ticks: 12, actual: 48, score: 'excellent' },
+    { ticks: 13, actual: 52, score: 'excellent' },
+    { ticks: 11, actual: 44, score: 'good' }, // 差6 > 許容差の半分(5)
+    { ticks: 15, actual: 60, score: 'good' }, // 差10（許容差ちょうど）
+    { ticks: 16, actual: 64, score: 'fail' }, // 遅すぎる
+    { ticks: 5, actual: 20, score: 'fail' }, // 早すぎる
+    { ticks: 38, actual: 48, score: 'excellent' }, // 右端から戻ってくる途中でタップ
+    { ticks: 0, actual: 0, score: 'fail' }, // 動き出す前にタップ
+  ])('$ticks 回動いた時点（位置 $actual %）でタップすると「$score」になる', async ({ ticks, actual, score }) => {
+    const { user, onComplete, button } = setup();
+    advanceTicks(ticks);
 
-    const [tapButton] = findAllButtons(result);
-    expect(tapButton.props.disabled).toBe(true);
+    await user.click(button);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledWith({ actual, score });
   });
 
-  it('移動タイマーが一定間隔で位置を進める', () => {
-    vi.useFakeTimers();
-    try {
-      stateValues = [{ position: 0, direction: 1 }, false];
-      useStateCallCount = 0;
-      MovingStampTapMinigame({ rule, onComplete: vi.fn() });
+  it('タップすると印鑑が止まり、ボタンも押せなくなる', async () => {
+    const { user, onComplete, button } = setup();
+    advanceTicks(12);
+    await user.click(button);
 
-      expect(registeredEffects.length).toBe(1);
-      const cleanup = registeredEffects[0]();
-      expect(typeof cleanup).toBe('function');
+    advanceTicks(30);
 
-      vi.advanceTimersByTime(60);
-
-      expect(stateSetters[0]).toHaveBeenCalledTimes(1);
-      const updater = stateSetters[0].mock.calls[0][0];
-      expect(typeof updater).toBe('function');
-      expect(updater({ position: 0, direction: 1 })).toEqual({ position: 4, direction: 1 });
-
-      if (typeof cleanup === 'function') cleanup();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(position()).toBe(48);
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('右端（100）に到達すると移動方向が反転する', () => {
-    vi.useFakeTimers();
-    try {
-      stateValues = [{ position: 98, direction: 1 }, false];
-      useStateCallCount = 0;
-      MovingStampTapMinigame({ rule, onComplete: vi.fn() });
+  it('アンマウント時にタイマーを解除する（解除漏れで動き続けない）', () => {
+    const { unmount } = render(<MovingStampTapMinigame rule={rule} onComplete={vi.fn()} />);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
 
-      registeredEffects[0]();
-      vi.advanceTimersByTime(60);
-      const fn = stateSetters[0].mock.calls[0][0];
-      expect(fn({ position: 98, direction: 1 })).toEqual({ position: 100, direction: -1 });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+    unmount();
 
-  it('左端（0）に到達すると移動方向が反転する', () => {
-    vi.useFakeTimers();
-    try {
-      stateValues = [{ position: 2, direction: -1 }, false];
-      useStateCallCount = 0;
-      MovingStampTapMinigame({ rule, onComplete: vi.fn() });
-
-      registeredEffects[0]();
-      vi.advanceTimersByTime(60);
-      const fn = stateSetters[0].mock.calls[0][0];
-      expect(fn({ position: 2, direction: -1 })).toEqual({ position: 0, direction: 1 });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('停止済み（stopped=true）の場合はタイマーを設定しない', () => {
-    stateValues = [{ position: 50, direction: 1 }, true];
-    useStateCallCount = 0;
-    MovingStampTapMinigame({ rule, onComplete: vi.fn() });
-
-    expect(registeredEffects.length).toBe(1);
-    const cleanup = registeredEffects[0]();
-    expect(cleanup).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -1,83 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import TiltStampMinigame from './TiltStampMinigame';
 import type { Rule } from '@/types/scenario';
 
-// DragDropStampMinigame.test.tsxと同じ方針: jsdomを使わず、useStateをモック
-// してReact要素ツリーを直接走査する（本コンポーネントの状態順は
-// dragging, startX, tiltDeg, resultの4つ）。
-let stateValues: any[] = [];
-let stateSetters: any[] = [];
-let useStateCallCount = 0;
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    useState: (initialValue: any) => {
-      const index = useStateCallCount;
-      useStateCallCount++;
-      if (stateValues[index] === undefined) {
-        stateValues[index] = initialValue;
-      }
-      const setter = (newValue: any) => {
-        if (typeof newValue === 'function') {
-          stateValues[index] = newValue(stateValues[index]);
-        } else {
-          stateValues[index] = newValue;
-        }
-        stateSetters[index](newValue);
-      };
-      return [stateValues[index], setter];
-    },
-  };
-});
-
-function findByRole(element: any, role: string): any {
-  if (!element) return undefined;
-  if (element.props && element.props.role === role) return element;
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      const found = findByRole(child, role);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
-function findAllButtons(element: any, acc: any[] = []): any[] {
-  if (!element) return acc;
-  if (element.type === 'button') acc.push(element);
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      findAllButtons(child, acc);
-    }
-  }
-  return acc;
-}
-
-// ドラッグ操作を受け付ける最外周のdiv（onMouseMove等を持つ）を取得するヘルパー
-function findDragArea(element: any): any {
-  if (!element) return undefined;
-  if (element.props && typeof element.props.onMouseMove === 'function') return element;
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      const found = findDragArea(child);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
+// 実装の定数: 横に1pxドラッグすると0.5度傾く（上限は左右とも90度）。
+// 目標15度・許容差5度 なので 12.5〜17.5度=excellent、10〜20度=good、それ以外=fail
 const rule: Rule = {
   id: 'test-tilt',
   description: 'テスト用傾きルール',
@@ -87,139 +15,138 @@ const rule: Rule = {
   tolerance: 5,
 };
 
+function setup() {
+  const onComplete = vi.fn();
+  const user = userEvent.setup();
+  render(<TiltStampMinigame rule={rule} onComplete={onComplete} />);
+  const stamp = screen.getByRole('button', { name: '鈴木' });
+  return {
+    user,
+    onComplete,
+    stamp,
+    area: stamp.parentElement as HTMLElement,
+    confirm: screen.getByRole('button', { name: '捺印する' }),
+  };
+}
+
+type User = ReturnType<typeof userEvent.setup>;
+
+// startXで掴み、endXまでマウスで動かす（離さない）
+async function dragHold(user: User, stamp: HTMLElement, startX: number, endX: number) {
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: stamp, coords: { clientX: startX } },
+    { target: stamp, coords: { clientX: endX } },
+  ]);
+}
+
+// 印影の現在の傾き（度）をtransformから読む
+function tiltDeg(stamp: HTMLElement): number {
+  const match = /rotate\((-?[\d.]+)deg\)/.exec(stamp.getAttribute('style') ?? '');
+  if (!match) throw new Error('印影の傾きを読み取れません');
+  return Number(match[1]);
+}
+
 describe('TiltStampMinigame', () => {
-  beforeEach(() => {
-    useStateCallCount = 0;
-    stateValues = [];
-    stateSetters = [vi.fn(), vi.fn(), vi.fn(), vi.fn()]; // dragging, startX, tiltDeg, result
+  it('初期状態は傾き0度で、ルールの説明文と有効な「捺印する」ボタンを表示する', () => {
+    const { stamp, confirm } = setup();
+
+    expect(tiltDeg(stamp)).toBe(0);
+    expect(screen.getByText('テスト用傾きルール')).toBeInTheDocument();
+    expect(confirm).toBeEnabled();
   });
 
-  it('確定前はドラッグ開始（onMouseDown）でdragging=true・startXが設定される', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it.each([
+    { dx: 30, deg: 15 },
+    { dx: -30, deg: -15 },
+    { dx: 400, deg: 90 }, // 右の上限
+    { dx: -400, deg: -90 }, // 左の上限
+  ])('掴んで横に$dx px動かすと、傾きが $deg 度になる（上限は±90度）', async ({ dx, deg }) => {
+    const { user, stamp } = setup();
 
-    const stamp = findByRole(result, 'button');
-    expect(stamp).toBeDefined();
-    stamp.props.onMouseDown({ clientX: 100 });
+    await dragHold(user, stamp, 100, 100 + dx);
 
-    expect(stateSetters[0]).toHaveBeenCalledWith(true); // setDragging(true)
-    expect(stateSetters[1]).toHaveBeenCalledWith(100); // setStartX(100)
+    expect(tiltDeg(stamp)).toBe(deg);
   });
 
-  it('確定済み（result有り）の場合はドラッグ開始しても何も起きない', () => {
-    stateValues = [false, null, 15, { actual: 15, score: 'excellent' }];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('掴んでいない状態でマウスを動かしても、傾かない', async () => {
+    const { user, stamp } = setup();
 
-    const stamp = findByRole(result, 'button');
-    stamp.props.onMouseDown({ clientX: 100 });
-    expect(stateSetters[0]).not.toHaveBeenCalled();
+    await user.pointer([{ target: stamp, coords: { clientX: 100 } }, { target: stamp, coords: { clientX: 160 } }]);
+
+    expect(tiltDeg(stamp)).toBe(0);
   });
 
-  it('ドラッグ中の移動でtiltDegが更新される（1pxあたり0.5度）', () => {
-    stateValues = [true, 100, 0, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('マウスを離すとドラッグが終わり、その後に動かしても傾きは変わらない', async () => {
+    const { user, stamp } = setup();
+    await dragHold(user, stamp, 100, 130);
+    await user.pointer({ keys: '[/MouseLeft]' });
 
-    const dragArea = findDragArea(result);
-    expect(dragArea).toBeDefined();
-    dragArea.props.onMouseMove({ clientX: 130 }); // 30px右 = 15度
+    await user.pointer({ target: stamp, coords: { clientX: 300 } });
 
-    expect(stateSetters[2]).toHaveBeenCalledWith(15);
+    expect(tiltDeg(stamp)).toBe(15);
   });
 
-  it('傾きは±90度でクランプされる', () => {
-    stateValues = [true, 0, 0, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('掴んだままエリアの外へマウスが出た場合も、ドラッグが終わる', async () => {
+    const { user, stamp, area } = setup();
+    await dragHold(user, stamp, 100, 130);
 
-    const dragArea = findDragArea(result);
-    dragArea.props.onMouseMove({ clientX: 1000 });
+    fireEvent.mouseLeave(area);
+    await user.pointer({ target: stamp, coords: { clientX: 300 } });
 
-    expect(stateSetters[2]).toHaveBeenCalledWith(90);
+    expect(tiltDeg(stamp)).toBe(15);
   });
 
-  it('dragging=falseの間は移動しても何も起きない', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('タッチ操作（スマートフォン）でも、掴んで動かして傾けられる', () => {
+    const { stamp, area } = setup();
 
-    const dragArea = findDragArea(result);
-    dragArea.props.onMouseMove({ clientX: 130 });
-    expect(stateSetters[2]).not.toHaveBeenCalled();
+    fireEvent.touchStart(stamp, { touches: [{ clientX: 100 }] });
+    fireEvent.touchMove(area, { touches: [{ clientX: 130 }] });
+    fireEvent.touchEnd(area);
+    fireEvent.touchMove(area, { touches: [{ clientX: 300 }] }); // 離した後は無視される
+
+    expect(tiltDeg(stamp)).toBe(15);
   });
 
-  it('「捺印する」ボタンで採点しonCompleteが呼ばれる（目標ちょうどでexcellent）', () => {
-    stateValues = [false, null, 15, null]; // tiltDeg=15 = target=15ちょうど
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = TiltStampMinigame({ rule, onComplete }) as any;
+  it('目標の角度（15度）で捺印するとexcellentでonCompleteが1回呼ばれ、ボタンが無効になる', async () => {
+    const { user, onComplete, stamp, confirm } = setup();
+    await dragHold(user, stamp, 100, 130);
+    await user.pointer({ keys: '[/MouseLeft]' });
 
-    const [confirmButton] = findAllButtons(result);
-    confirmButton.props.onClick();
+    await user.click(confirm);
 
-    expect(stateSetters[3]).toHaveBeenCalledWith({ actual: 15, score: 'excellent' });
+    expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith({ actual: 15, score: 'excellent' });
+    expect(confirm).toBeDisabled();
   });
 
-  it('目標から大きく外れて確定するとfailでonCompleteが呼ばれる', () => {
-    stateValues = [false, null, 80, null];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = TiltStampMinigame({ rule, onComplete }) as any;
+  it.each([
+    { dx: 24, actual: 12, score: 'good' }, // 差3 > 許容差の半分(2.5)、≦ 許容差5
+    { dx: 40, actual: 20, score: 'good' }, // 差5（許容差ちょうど）
+    { dx: 16, actual: 8, score: 'fail' }, // 差7 > 5
+    { dx: 0, actual: 0, score: 'fail' }, // 傾けずに捺印
+    { dx: -30, actual: -15, score: 'fail' }, // 逆向きに傾ける
+  ])('$actual 度で捺印すると「$score」になる', async ({ dx, actual, score }) => {
+    const { user, onComplete, stamp, confirm } = setup();
+    if (dx !== 0) {
+      await dragHold(user, stamp, 100, 100 + dx);
+      await user.pointer({ keys: '[/MouseLeft]' });
+    }
 
-    const [confirmButton] = findAllButtons(result);
-    confirmButton.props.onClick();
+    await user.click(confirm);
 
-    expect(onComplete).toHaveBeenCalledWith({ actual: 80, score: 'fail' });
+    expect(onComplete).toHaveBeenCalledWith({ actual, score });
   });
 
-  it('ドラッグ終了（onMouseUp）でdragging=false・startX=nullになる', () => {
-    stateValues = [true, 100, 15, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('捺印後は、もう一度掴んで動かしても傾きは変わらず、記録も増えない', async () => {
+    const { user, onComplete, stamp, confirm } = setup();
+    await dragHold(user, stamp, 100, 130);
+    await user.pointer({ keys: '[/MouseLeft]' });
+    await user.click(confirm);
 
-    const dragArea = findDragArea(result);
-    dragArea.props.onMouseUp();
+    await dragHold(user, stamp, 100, 200);
+    await user.pointer({ keys: '[/MouseLeft]' });
 
-    expect(stateSetters[0]).toHaveBeenCalledWith(false); // setDragging(false)
-    expect(stateSetters[1]).toHaveBeenCalledWith(null); // setStartX(null)
-  });
-
-  it('dragging=falseの状態でonMouseUpが呼ばれても何も起きない', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
-
-    const dragArea = findDragArea(result);
-    dragArea.props.onMouseUp();
-    expect(stateSetters[0]).not.toHaveBeenCalled();
-  });
-
-  it('タッチ操作（onTouchStart/onTouchMove）でも同様に傾きが更新される', () => {
-    stateValues = [true, 100, 0, null];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
-
-    const stamp = findByRole(result, 'button');
-    stamp.props.onTouchStart({ touches: [{ clientX: 100 }] });
-    expect(stateSetters[1]).toHaveBeenCalledWith(100); // setStartX(100)
-
-    const dragArea = findDragArea(result);
-    dragArea.props.onTouchMove({ touches: [{ clientX: 130 }] });
-    expect(stateSetters[2]).toHaveBeenCalledWith(15);
-
-    dragArea.props.onTouchEnd();
-    expect(stateSetters[0]).toHaveBeenCalledWith(false);
-  });
-
-  it('確定済み（result有り）の場合は「捺印する」ボタンが無効化される', () => {
-    stateValues = [false, null, 15, { actual: 15, score: 'excellent' }];
-    useStateCallCount = 0;
-    const result = TiltStampMinigame({ rule, onComplete: vi.fn() }) as any;
-
-    const [confirmButton] = findAllButtons(result);
-    expect(confirmButton.props.disabled).toBe(true);
+    expect(tiltDeg(stamp)).toBe(15);
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });
