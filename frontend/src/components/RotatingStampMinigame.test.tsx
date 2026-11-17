@@ -1,54 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import RotatingStampMinigame from './RotatingStampMinigame';
 import type { Rule } from '@/types/scenario';
 
-// page.test.tsx・ScenarioSelectionScreen.test.tsxと同じ方針: jsdomを使わず、
-// useState/useEffectをモックしてReact要素ツリーを直接走査する。
-let stateValues: any[] = [];
-let stateSetters: any[] = [];
-let useStateCallCount = 0;
-let registeredEffects: (() => void | (() => void))[] = [];
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    useState: (initialValue: any) => {
-      const index = useStateCallCount;
-      useStateCallCount++;
-      if (stateValues[index] === undefined) {
-        stateValues[index] = initialValue;
-      }
-      const setter = (newValue: any) => {
-        if (typeof newValue === 'function') {
-          stateValues[index] = newValue(stateValues[index]);
-        } else {
-          stateValues[index] = newValue;
-        }
-        stateSetters[index](newValue);
-      };
-      return [stateValues[index], setter];
-    },
-    useEffect: (callback: () => void | (() => void)) => {
-      registeredEffects.push(callback);
-    },
-  };
-});
-
-function findAllButtons(element: any, acc: any[] = []): any[] {
-  if (!element) return acc;
-  if (element.type === 'button') acc.push(element);
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      findAllButtons(child, acc);
-    }
-  }
-  return acc;
-}
+// 印鑑は100msごとに6度ずつ回転する（実装の定数）。実際に到達できる角度のみで検証する。
+const TICK_MS = 100;
+const DEG_PER_TICK = 6;
 
 const rule: Rule = {
   id: 'kito-bow-angle',
@@ -59,53 +17,109 @@ const rule: Rule = {
   tolerance: 10,
 };
 
+function setup(ruleOverride: Rule = rule) {
+  const onComplete = vi.fn();
+  const user = userEvent.setup();
+  render(<RotatingStampMinigame rule={ruleOverride} onComplete={onComplete} />);
+  return { user, onComplete };
+}
+
+function advanceTicks(ticks: number) {
+  act(() => {
+    vi.advanceTimersByTime(ticks * TICK_MS);
+  });
+}
+
+// 回転する印鑑のtransformから現在の角度を読む
+function currentAngle(): number {
+  const style = screen.getByText('鈴木').parentElement?.getAttribute('style') ?? '';
+  const match = /rotate\((-?[\d.]+)deg\)/.exec(style);
+  return Number(match?.[1]);
+}
+
 describe('RotatingStampMinigame', () => {
   beforeEach(() => {
-    useStateCallCount = 0;
-    stateValues = [];
-    stateSetters = [vi.fn(), vi.fn()]; // angle, stopped
-    registeredEffects = [];
+    // 本コンポーネントはsetIntervalのみ使う。setTimeoutまで偽装すると、Testing Libraryと
+    // userEvent内部のsetTimeout待機が進まず固まるため、setInterval系だけを偽装する
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   });
 
-  it('停止前は「止める」ボタンが有効で、ルールの説明文を表示する', () => {
-    stateValues = [0, false];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = RotatingStampMinigame({ rule, onComplete }) as any;
-
-    const buttons = findAllButtons(result);
-    expect(buttons.length).toBe(1);
-    expect(buttons[0].props.disabled).toBe(false);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('目標角度ちょうどで停止するとexcellentでonCompleteが呼ばれる', () => {
-    stateValues = [90, false];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = RotatingStampMinigame({ rule, onComplete }) as any;
+  it('停止前は「止める」ボタンが有効で、ルールの説明文と0度の印鑑を表示する', () => {
+    setup();
 
-    const [stopButton] = findAllButtons(result);
-    stopButton.props.onClick();
+    expect(screen.getByRole('button', { name: '止める' })).toBeEnabled();
+    expect(screen.getByText('テスト用ルール')).toBeInTheDocument();
+    expect(currentAngle()).toBe(0);
+  });
 
-    expect(stateSetters[1]).toHaveBeenCalledWith(true); // setStopped(true)
+  it('時間とともに6度ずつ回転し、360度で0度へ折り返す', () => {
+    setup();
+
+    advanceTicks(1);
+    expect(currentAngle()).toBe(DEG_PER_TICK);
+
+    advanceTicks(59);
+    expect(currentAngle()).toBe(0); // 360度ちょうど
+
+    advanceTicks(1);
+    expect(currentAngle()).toBe(DEG_PER_TICK);
+  });
+
+  it('目標角度ちょうどで止めるとexcellentでonCompleteが1回呼ばれ、ボタンが無効になる', async () => {
+    const { user, onComplete } = setup();
+
+    advanceTicks(15); // 6 x 15 = 90度
+    await user.click(screen.getByRole('button', { name: '止める' }));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith({ actual: 90, score: 'excellent' });
+    expect(screen.getByRole('button', { name: '止める' })).toBeDisabled();
   });
 
-  it('目標から大きく外れて停止するとfailでonCompleteが呼ばれる', () => {
-    stateValues = [200, false];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = RotatingStampMinigame({ rule, onComplete }) as any;
+  it('許容差の範囲内（ただし半分より外）ならgoodになる', async () => {
+    const { user, onComplete } = setup();
 
-    const [stopButton] = findAllButtons(result);
-    stopButton.props.onClick();
+    advanceTicks(14); // 84度。目標90との差6 > 許容差10の半分(5)
+    await user.click(screen.getByRole('button', { name: '止める' }));
 
-    // 200度は-180〜180への正規化で200-360=-160として採点される
-    expect(onComplete).toHaveBeenCalledWith({ actual: -160, score: 'fail' });
+    expect(onComplete).toHaveBeenCalledWith({ actual: 84, score: 'good' });
   });
 
-  it('180度を超える角度は-180〜180の範囲へ正規化してから採点する（負のtargetを持つルール対応）', () => {
-    // お辞儀ハンコ等、左傾き（負の角度）を要求するルールの例
+  it('許容差の範囲外で止めるとfailになる', async () => {
+    const { user, onComplete } = setup();
+
+    advanceTicks(13); // 78度。目標90との差12 > 許容差10
+    await user.click(screen.getByRole('button', { name: '止める' }));
+
+    expect(onComplete).toHaveBeenCalledWith({ actual: 78, score: 'fail' });
+  });
+
+  it('止めた後は回転が止まり、ボタンも押せない', async () => {
+    const { user, onComplete } = setup();
+
+    advanceTicks(15);
+    await user.click(screen.getByRole('button', { name: '止める' }));
+    advanceTicks(30);
+
+    expect(currentAngle()).toBe(90);
+    await user.click(screen.getByRole('button', { name: '止める' }));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('180度を超える角度は-180〜180度へ正規化してから採点する', async () => {
+    const { user, onComplete } = setup();
+
+    advanceTicks(33); // 198度 → 198-360=-162度
+    await user.click(screen.getByRole('button', { name: '止める' }));
+
+    expect(onComplete).toHaveBeenCalledWith({ actual: -162, score: 'fail' });
+  });
+
+  it('負の目標角度（左傾き）を持つルールでも、正規化により達成できる', async () => {
     const bowRule: Rule = {
       id: 'bow-angle',
       description: 'お辞儀角度ルール',
@@ -114,59 +128,21 @@ describe('RotatingStampMinigame', () => {
       target: -22.5,
       tolerance: 12.5,
     };
-    // 内部の生角度337.5（0〜354・6度刻みでは336または342が相当）は
-    // 正規化すると337.5-360=-22.5で目標ちょうどになる
-    stateValues = [337.5, false];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = RotatingStampMinigame({ rule: bowRule, onComplete }) as any;
+    const { user, onComplete } = setup(bowRule);
 
-    const [stopButton] = findAllButtons(result);
-    stopButton.props.onClick();
+    advanceTicks(56); // 336度 → -24度。目標-22.5との差1.5
+    await user.click(screen.getByRole('button', { name: '止める' }));
 
-    expect(onComplete).toHaveBeenCalledWith({ actual: -22.5, score: 'excellent' });
+    expect(onComplete).toHaveBeenCalledWith({ actual: -24, score: 'excellent' });
   });
 
-  it('停止済み（stopped=true）の場合は「止める」ボタンが無効化される', () => {
-    stateValues = [90, true];
-    useStateCallCount = 0;
-    const result = RotatingStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('アンマウント時にタイマーを解除する（解除漏れで回り続けない）', () => {
+    const { unmount } = render(<RotatingStampMinigame rule={rule} onComplete={vi.fn()} />);
+    const timersBefore = vi.getTimerCount();
 
-    const [stopButton] = findAllButtons(result);
-    expect(stopButton.props.disabled).toBe(true);
-  });
+    unmount();
 
-  it('回転タイマーが一定間隔で角度を進める（360で折り返す）', () => {
-    vi.useFakeTimers();
-    try {
-      stateValues = [354, false];
-      useStateCallCount = 0;
-      RotatingStampMinigame({ rule, onComplete: vi.fn() });
-
-      expect(registeredEffects.length).toBe(1);
-      const cleanup = registeredEffects[0]();
-      expect(typeof cleanup).toBe('function');
-
-      vi.advanceTimersByTime(100);
-
-      expect(stateSetters[0]).toHaveBeenCalledTimes(1);
-      const updater = stateSetters[0].mock.calls[0][0];
-      expect(typeof updater).toBe('function');
-      expect(updater(354)).toBe(0); // (354 + 6) % 360 = 0（折り返し）
-
-      if (typeof cleanup === 'function') cleanup();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('停止済み（stopped=true）の場合はタイマーを設定しない', () => {
-    stateValues = [90, true];
-    useStateCallCount = 0;
-    RotatingStampMinigame({ rule, onComplete: vi.fn() });
-
-    expect(registeredEffects.length).toBe(1);
-    const cleanup = registeredEffects[0]();
-    expect(cleanup).toBeUndefined();
+    expect(timersBefore).toBeGreaterThan(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
