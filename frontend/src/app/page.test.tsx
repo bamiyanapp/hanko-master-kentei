@@ -1,330 +1,281 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Home from './page';
-import React from 'react';
-import ScenarioSelectionScreen from '@/components/ScenarioSelectionScreen';
-import ApplicationStageFlow from '@/components/ApplicationStageFlow';
-import ScenarioResultScreen from '@/components/ScenarioResultScreen';
-import EndingSequence from '@/components/EndingSequence';
-import { scenarios, pcPurchaseScenario } from '@/data/scenarios';
-import { RANK_NAMES } from '@/lib/rank';
+import { playClickSound, playSuccessSound, playFailureSound } from './sfx';
+import { pcPurchaseScenario } from '@/data/scenarios';
 
-// window オブジェクトのモック
-const mockPushState = vi.fn();
-const mockLocation = {
-  pathname: '/test',
-  search: '',
-};
+// 効果音は外部境界（ブラウザのAudio）のため差し替えて、鳴らし分けだけを検証する。
+vi.mock('./sfx', () => ({
+  playClickSound: vi.fn(),
+  playSuccessSound: vi.fn(),
+  playFailureSound: vi.fn(),
+}));
 
-global.window = {
-  location: mockLocation,
-  history: {
-    pushState: mockPushState,
-  },
-} as any;
-
-// グローバルな状態管理（テストごとに初期化）
-let stateValues: any[] = [];
-let stateSetters: any[] = [];
-let useStateCallCount = 0;
-let registeredEffects: (() => void)[] = [];
-
-// useState & useEffect のカスタムモック
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
+// プレイ画面（ステージ進行）は、ApplicationStageFlow.test.tsxで実物のミニゲームごと検証済み。
+// ここでは「案件を渡され、完了・戻るを通知してくる」という境界だけを軽い代役にし、
+// トップ画面側の配線（画面遷移・URL同期・進捗の保存・昇格演出）に集中する。
+vi.mock('@/components/ApplicationStageFlow', async () => {
+  const React = await import('react');
+  const result = (passed: boolean, overallScore: number) => ({
+    overallScore,
+    passed,
+    comment: passed ? 'おおむね問題ありません。' : '残念ながら基準を満たしていません。',
+    metricScores: { 格式: null, 礼節: null, 誠意: null, 精密性: null },
+  });
   return {
-    ...actual,
-    useState: (initialValue: any) => {
-      const index = useStateCallCount;
-      useStateCallCount++;
-
-      if (stateValues[index] === undefined) {
-        stateValues[index] = initialValue;
-      }
-
-      const setter = (newValue: any) => {
-        if (typeof newValue === 'function') {
-          stateValues[index] = newValue(stateValues[index]);
-        } else {
-          stateValues[index] = newValue;
-        }
-        stateSetters[index](newValue);
-      };
-
-      return [stateValues[index], setter];
-    },
-    useEffect: (callback: () => void) => {
-      registeredEffects.push(callback);
-    },
+    default: ({
+      scenario,
+      onComplete,
+      onBack,
+    }: {
+      scenario: { id: string };
+      onComplete: (r: ReturnType<typeof result>) => void;
+      onBack: () => void;
+    }) =>
+      React.createElement(
+        'div',
+        null,
+        React.createElement('p', null, `プレイ中: ${scenario.id}`),
+        React.createElement('button', { onClick: () => onComplete(result(true, 100)) }, '満点で完了'),
+        React.createElement('button', { onClick: () => onComplete(result(false, 30)) }, '不合格で完了'),
+        React.createElement('button', { onClick: onBack }, 'プレイ画面の戻る'),
+      ),
   };
 });
 
-function getElementText(element: any): string {
-  if (!element) return '';
-  if (typeof element === 'string') return element;
-  if (typeof element === 'number') return String(element);
-  if (Array.isArray(element)) return element.map(getElementText).join('');
-  if (element.props && element.props.children) {
-    return getElementText(element.props.children);
-  }
-  return '';
+const STORAGE_KEY = 'hanko-master-kentei:progress';
+
+// 実績ポイントの境界（実装: 基礎10点＋総合スコア/10。満点クリアで+20点）
+// 見習い0〜 / 初級10〜 / 中級25〜 / 上級45〜 / 師範70〜 / ハンコマスター100〜
+function saveProgress(points: number, clearedScenarioIds: string[] = []) {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ points, clearedScenarioIds }));
 }
 
-function findByText(element: any, text: string): any {
-  if (!element) return undefined;
-  if (typeof element === 'string' || typeof element === 'number') return undefined;
-
-  const elementText = getElementText(element);
-  if (elementText.includes(text)) {
-    if (element.props && element.props.children) {
-      if (Array.isArray(element.props.children)) {
-        for (const child of element.props.children) {
-          const found = findByText(child, text);
-          if (found) return found;
-        }
-      } else {
-        const found = findByText(element.props.children, text);
-        if (found) return found;
-      }
-    }
-    return element;
-  }
-  return undefined;
+function storedProgress() {
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
 }
 
-function findByType(element: any, type: any): any {
-  if (!element) return undefined;
-  if (element.type === type) return element;
-  if (element.props && element.props.children) {
-    if (Array.isArray(element.props.children)) {
-      for (const child of element.props.children) {
-        const found = findByType(child, type);
-        if (found) return found;
-      }
-    } else {
-      return findByType(element.props.children, type);
-    }
-  }
-  return undefined;
+const scenarioButton = () =>
+  screen.getByRole('button', { name: (name) => name.includes(pcPurchaseScenario.title) });
+
+async function goToSelection(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: '検定を受ける' }));
 }
 
-describe('Home Component Integration', () => {
+describe('Home（トップ画面）', () => {
   beforeEach(() => {
-    useStateCallCount = 0;
-    stateValues = [];
-    stateSetters = [
-      vi.fn(), // screen
-      vi.fn(), // selectedScenario
-      vi.fn(), // scenarioResult
-      vi.fn(), // progress
-      vi.fn(), // rankUpTo
-    ];
-    registeredEffects = [];
-    mockLocation.search = '';
-    mockPushState.mockClear();
+    window.localStorage.clear();
+    window.history.replaceState(null, '', '/');
+    vi.clearAllMocks();
   });
 
-  it('should render top screen initially and transition to selection screen', () => {
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement;
-    expect(result.type).toBe('main');
-
-    const rankText = findByText(result, '見習い');
-    expect(rankText).toBeDefined();
-
-    const startButton = findByText(result, '検定を受ける');
-    expect(startButton).toBeDefined();
-
-    startButton.props.onClick();
-    expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
-  it('should restore selection screen from URL params', () => {
-    mockLocation.search = '?screen=selection';
-    useStateCallCount = 0;
-    Home();
+  describe('トップ画面', () => {
+    it('初期状態は「見習い・0点」で、未実装の導線は押せない', async () => {
+      render(<Home />);
 
-    registeredEffects.forEach((effect) => effect());
-
-    expect(stateSetters[0]).toHaveBeenCalledWith('selection');
-  });
-
-  it('should restore game screen with the referenced scenario from URL params', () => {
-    mockLocation.search = `?screen=game&scenario=${pcPurchaseScenario.id}`;
-    useStateCallCount = 0;
-    Home();
-
-    registeredEffects.forEach((effect) => effect());
-
-    expect(stateSetters[1]).toHaveBeenCalledWith(pcPurchaseScenario); // setSelectedScenario
-    expect(stateSetters[0]).toHaveBeenCalledWith('game'); // setScreen('game')
-  });
-
-  it('should not restore game screen when the referenced scenario id does not exist', () => {
-    mockLocation.search = '?screen=game&scenario=not-exist';
-    useStateCallCount = 0;
-    Home();
-
-    registeredEffects.forEach((effect) => effect());
-
-    expect(stateSetters[0]).not.toHaveBeenCalled();
-    expect(stateSetters[1]).not.toHaveBeenCalled();
-  });
-
-  it('should render ScenarioSelectionScreen with correct props when screen is selection', () => {
-    stateValues = ['selection', null, null, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
-
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
-
-    expect(result.type).toBe(ScenarioSelectionScreen);
-    expect(result.props.scenarios).toBe(scenarios);
-    expect(result.props.currentRank).toBe(0);
-    expect(result.props.clearedScenarioIds).toEqual([]);
-
-    result.props.onSelect(scenarios[0].id);
-    expect(stateSetters[1]).toHaveBeenCalledWith(scenarios[0]); // setSelectedScenario
-    expect(stateSetters[0]).toHaveBeenCalledWith('game'); // setScreen('game')
-
-    result.props.onBack();
-    expect(stateSetters[0]).toHaveBeenCalledWith('top'); // setScreen('top')
-  });
-
-  it('should render ApplicationStageFlow with the selected scenario when screen is game', () => {
-    stateValues = ['game', pcPurchaseScenario, null, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
-
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
-
-    const flow = findByType(result, ApplicationStageFlow as any);
-    expect(flow).toBeDefined();
-    expect(flow.props.scenario).toBe(pcPurchaseScenario);
-
-    // onCompleteでresult画面へ遷移する
-    const judgement = {
-      overallScore: 90,
-      metricScores: { 格式: null, 礼節: 90, 誠意: null, 精密性: null },
-      passed: true,
-      comment: 'おおむね問題ありません。',
-    };
-    flow.props.onComplete(judgement);
-    expect(stateSetters[2]).toHaveBeenCalledWith(judgement); // setScenarioResult
-    expect(stateSetters[0]).toHaveBeenCalledWith('result'); // setScreen('result')
-    // 合格時はrecordScenarioClearを通じてprogressも更新される
-    // （overallScore=90 -> 基礎10点+round(90/10)=9点 = 19点）
-    expect(stateSetters[3]).toHaveBeenCalledWith({
-      rankIndex: 1,
-      points: 19,
-      clearedScenarioIds: [pcPurchaseScenario.id],
+      expect(screen.getByRole('heading', { level: 1, name: 'ハンコマスター検定' })).toBeInTheDocument();
+      expect(await screen.findByText('見習い')).toBeInTheDocument();
+      expect(screen.getByText('0点')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '検定を受ける' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /実績/ })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /ランキング/ })).toBeDisabled();
     });
-    // rankIndexが0(見習い)から1(初級)へ上がったので昇格演出が設定される
-    expect(stateSetters[4]).toHaveBeenCalledWith(1); // setRankUpTo(1)
+
+    it('保存済みの進捗（実績ポイントとそれに応じた階級）を復元して表示する', async () => {
+      saveProgress(45);
+
+      render(<Home />);
+
+      expect(await screen.findByText('上級')).toBeInTheDocument();
+      expect(screen.getByText('45点')).toBeInTheDocument();
+    });
+
+    it('保存データが壊れていても、初期状態として扱い落ちない', async () => {
+      window.localStorage.setItem(STORAGE_KEY, 'これはJSONではない');
+
+      render(<Home />);
+
+      expect(await screen.findByText('見習い')).toBeInTheDocument();
+      expect(screen.getByText('0点')).toBeInTheDocument();
+    });
+
+    it('ビルド情報が未設定なら「開発版」、設定されていればバージョン・コミット・日時を表示する', () => {
+      const { unmount } = render(<Home />);
+      expect(screen.getByText('開発版')).toBeInTheDocument();
+      unmount();
+
+      vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '1.2.3');
+      vi.stubEnv('NEXT_PUBLIC_APP_BUILD_SHA', 'abc1234');
+      vi.stubEnv('NEXT_PUBLIC_APP_BUILD_TIME', '2026-11-17T00:00:00Z');
+      render(<Home />);
+
+      expect(screen.getByText('v1.2.3 / abc1234 / 2026-11-17T00:00:00Z')).toBeInTheDocument();
+    });
   });
 
-  it('should not set rankUpTo when the rank does not change', () => {
-    // 既にrankIndex=1（初級）の状態から、クリアしても閾値25未満のためランクは変わらない
-    stateValues = [
-      'game',
-      pcPurchaseScenario,
-      null,
-      { rankIndex: 1, points: 10, clearedScenarioIds: [] },
-    ];
+  describe('画面遷移とURL同期', () => {
+    it('「検定を受ける」で案件選択へ進み、URLに反映され、クリック音が鳴る', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
 
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
+      await goToSelection(user);
 
-    const flow = findByType(result, ApplicationStageFlow as any);
-    const judgement = {
-      overallScore: 30,
-      metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
-      passed: true,
-      comment: 'おおむね問題ありません。',
-    };
-    // 10点 + 基礎10点+round(30/10)=3点 = 23点（rankIndex=1のまま、25未満）
-    flow.props.onComplete(judgement);
+      expect(screen.getByRole('heading', { name: '案件を選択してください' })).toBeInTheDocument();
+      expect(window.location.search).toBe('?screen=selection');
+      expect(playClickSound).toHaveBeenCalledTimes(1);
+    });
 
-    expect(stateSetters[4]).toHaveBeenCalledWith(null); // setRankUpTo(null)
+    it('案件選択の「戻る」でトップへ戻り、URLからクエリが消える', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
+      await goToSelection(user);
+
+      await user.click(screen.getByRole('button', { name: '戻る' }));
+
+      expect(screen.getByRole('heading', { level: 1, name: 'ハンコマスター検定' })).toBeInTheDocument();
+      expect(window.location.search).toBe('');
+    });
+
+    it('案件を選ぶとプレイ画面へ進み、案件名・案件idがURLに反映される', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
+      await goToSelection(user);
+
+      await user.click(scenarioButton());
+
+      expect(screen.getByRole('heading', { name: pcPurchaseScenario.title })).toBeInTheDocument();
+      expect(screen.getByText(`プレイ中: ${pcPurchaseScenario.id}`)).toBeInTheDocument();
+      expect(window.location.search).toBe(`?screen=game&scenario=${pcPurchaseScenario.id}`);
+    });
+
+    it('プレイ画面の「戻る」で案件選択へ戻る', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
+      await goToSelection(user);
+      await user.click(scenarioButton());
+
+      await user.click(screen.getByRole('button', { name: 'プレイ画面の戻る' }));
+
+      expect(screen.getByRole('heading', { name: '案件を選択してください' })).toBeInTheDocument();
+      expect(window.location.search).toBe('?screen=selection');
+    });
+
+    it('URLの指定（案件選択）から画面を復元する', async () => {
+      window.history.replaceState(null, '', '/?screen=selection');
+
+      render(<Home />);
+
+      expect(await screen.findByRole('heading', { name: '案件を選択してください' })).toBeInTheDocument();
+    });
+
+    it('URLの指定（プレイ画面と案件id）から該当の案件のプレイ画面を復元する', async () => {
+      window.history.replaceState(null, '', `/?screen=game&scenario=${pcPurchaseScenario.id}`);
+
+      render(<Home />);
+
+      expect(await screen.findByText(`プレイ中: ${pcPurchaseScenario.id}`)).toBeInTheDocument();
+    });
+
+    it('URLが存在しない案件idを指していても、トップ画面のままで落ちない', async () => {
+      window.history.replaceState(null, '', '/?screen=game&scenario=no-such-scenario');
+
+      render(<Home />);
+
+      expect(screen.getByRole('heading', { level: 1, name: 'ハンコマスター検定' })).toBeInTheDocument();
+      expect(screen.queryByText(/プレイ中:/)).not.toBeInTheDocument();
+    });
   });
 
-  it('should not record progress when the scenario is not passed', () => {
-    stateValues = ['game', pcPurchaseScenario, null, { rankIndex: 0, points: 0, clearedScenarioIds: [] }];
+  describe('案件クリアと進捗', () => {
+    async function playAndComplete(user: ReturnType<typeof userEvent.setup>, buttonName: string) {
+      await goToSelection(user);
+      await user.click(scenarioButton());
+      await user.click(screen.getByRole('button', { name: buttonName }));
+    }
 
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
+    it('合格すると結果画面へ進み、成功音が鳴り、実績ポイントとクリア済み案件が保存され、昇格が表示される', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
 
-    const flow = findByType(result, ApplicationStageFlow as any);
-    const judgement = {
-      overallScore: 30,
-      metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null },
-      passed: false,
-      comment: '残念ながら基準を満たしていません。再提出をお願いします。',
-    };
-    flow.props.onComplete(judgement);
+      await playAndComplete(user, '満点で完了');
 
-    expect(stateSetters[3]).not.toHaveBeenCalled(); // setProgressは呼ばれない
-  });
+      expect(screen.getByRole('heading', { name: `${pcPurchaseScenario.title}：案件クリア` })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /昇格.*「初級」に認定されました/ })).toBeInTheDocument();
+      expect(playSuccessSound).toHaveBeenCalledTimes(1);
+      expect(playFailureSound).not.toHaveBeenCalled();
+      // 基礎10点 + 満点100/10 = 20点
+      expect(storedProgress()).toEqual({ points: 20, clearedScenarioIds: [pcPurchaseScenario.id] });
+      expect(window.location.search).toBe(`?screen=result&scenario=${pcPurchaseScenario.id}`);
+    });
 
-  it('should render ScenarioResultScreen with correct props when screen is result', () => {
-    const judgement = {
-      overallScore: 90,
-      metricScores: { 格式: null, 礼節: 90, 誠意: null, 精密性: 80 },
-      passed: true,
-      comment: 'おおむね問題ありません。',
-    };
-    stateValues = [
-      'result',
-      pcPurchaseScenario,
-      judgement,
-      { rankIndex: 0, points: 0, clearedScenarioIds: [] },
-      null,
-    ];
+    it('クリア後に案件選択へ戻ると、その案件が「クリア済み」になり、トップの階級・点数にも反映される', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
+      await playAndComplete(user, '満点で完了');
 
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
+      await user.click(screen.getByRole('button', { name: '案件選択へ戻る' }));
+      expect(scenarioButton()).toHaveTextContent('✓');
 
-    expect(result.type).toBe(ScenarioResultScreen);
-    expect(result.props.scenario).toBe(pcPurchaseScenario);
-    expect(result.props.result).toBe(judgement);
-    expect(result.props.rankUpTo).toBeNull();
+      await user.click(screen.getByRole('button', { name: '戻る' }));
+      expect(screen.getByText('初級')).toBeInTheDocument();
+      expect(screen.getByText('20点')).toBeInTheDocument();
+    });
 
-    result.props.onBackToSelection();
-    expect(stateSetters[0]).toHaveBeenCalledWith('selection'); // setScreen('selection')
-    expect(stateSetters[4]).toHaveBeenCalledWith(null); // setRankUpTo(null)
-  });
+    it('不合格だと失敗音が鳴り、差し戻しの結果になり、進捗は保存されず昇格もしない', async () => {
+      const user = userEvent.setup();
+      render(<Home />);
 
-  it('should pass rankUpTo through to ScenarioResultScreen and wire onShowEnding to the ending screen', () => {
-    const judgement = {
-      overallScore: 100,
-      metricScores: { 格式: null, 礼節: 100, 誠意: null, 精密性: 100 },
-      passed: true,
-      comment: '非常に模範的な捺印です。文句のつけようがありません。',
-    };
-    const maxRankIndex = RANK_NAMES.length - 1;
-    stateValues = [
-      'result',
-      pcPurchaseScenario,
-      judgement,
-      { rankIndex: maxRankIndex, points: 999, clearedScenarioIds: [pcPurchaseScenario.id] },
-      maxRankIndex,
-    ];
+      await playAndComplete(user, '不合格で完了');
 
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
+      expect(screen.getByRole('heading', { name: /差し戻されました/ })).toBeInTheDocument();
+      expect(screen.queryByText(/昇格/)).not.toBeInTheDocument();
+      expect(playFailureSound).toHaveBeenCalledTimes(1);
+      expect(playSuccessSound).not.toHaveBeenCalled();
+      expect(storedProgress()).toBeNull();
+    });
 
-    expect(result.props.rankUpTo).toBe(maxRankIndex);
+    it('合格しても階級が上がらない場合は、昇格を表示しない', async () => {
+      saveProgress(45); // 上級。+20点で65点でも上級のまま
+      const user = userEvent.setup();
+      render(<Home />);
+      await screen.findByText('上級');
 
-    result.props.onShowEnding();
-    expect(stateSetters[0]).toHaveBeenCalledWith('ending'); // setScreen('ending')
-  });
+      await playAndComplete(user, '満点で完了');
 
-  it('should render EndingSequence when screen is ending and wire onFinish back to top', () => {
-    stateValues = ['ending', pcPurchaseScenario, null, { rankIndex: 5, points: 999, clearedScenarioIds: [] }, 5];
+      expect(screen.getByRole('heading', { name: /承認されました/ })).toBeInTheDocument();
+      expect(screen.queryByText(/昇格/)).not.toBeInTheDocument();
+      expect(storedProgress()).toEqual({ points: 65, clearedScenarioIds: [pcPurchaseScenario.id] });
+    });
 
-    useStateCallCount = 0;
-    const result = Home() as React.ReactElement<any>;
+    it('最高ランク（ハンコマスター）へ昇格すると、エンディングを最後まで見てトップへ戻れる', async () => {
+      saveProgress(85); // 師範。+20点で105点 = ハンコマスター
+      const user = userEvent.setup();
+      render(<Home />);
+      await screen.findByText('師範');
 
-    expect(result.type).toBe(EndingSequence);
-    result.props.onFinish();
-    expect(stateSetters[0]).toHaveBeenCalledWith('top'); // setScreen('top')
+      await playAndComplete(user, '満点で完了');
+      expect(screen.getByRole('heading', { name: /昇格.*「ハンコマスター」に認定されました/ })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '案件選択へ戻る' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'エンディングを見る' }));
+      expect(window.location.search).toBe('?screen=ending');
+      for (let i = 0; i < 5; i++) {
+        await user.click(screen.getByRole('main'));
+      }
+      expect(screen.getByRole('heading', { name: 'GAME CLEAR' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'トップ画面へ戻る' }));
+
+      expect(screen.getByRole('heading', { level: 1, name: 'ハンコマスター検定' })).toBeInTheDocument();
+      expect(screen.getByText('ハンコマスター')).toBeInTheDocument();
+      expect(screen.getByText('105点')).toBeInTheDocument();
+      expect(window.location.search).toBe('');
+    });
   });
 });
