@@ -1,392 +1,221 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ApplicationStageFlow, { CustomRuleStub } from './ApplicationStageFlow';
-import RotatingStampMinigame from './RotatingStampMinigame';
-import LongPressStampMinigame from './LongPressStampMinigame';
-import DragDropStampMinigame from './DragDropStampMinigame';
-import TiltStampMinigame from './TiltStampMinigame';
-import MovingStampTapMinigame from './MovingStampTapMinigame';
-import type { Scenario } from '@/types/scenario';
+import type { Rule, Scenario, Stage, StageType } from '@/types/scenario';
 
-// page.test.tsx等と同じ方針: jsdomを使わず、useStateをモックしてReact要素
-// ツリーを直接走査する（本コンポーネントの状態順は
-// stageIndex, ruleIndex, stageResults, allResults, stageJudgementの5つ）。
-let stateValues: any[] = [];
-let stateSetters: any[] = [];
-let useStateCallCount = 0;
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    useState: (initialValue: any) => {
-      const index = useStateCallCount;
-      useStateCallCount++;
-      if (stateValues[index] === undefined) {
-        stateValues[index] = initialValue;
-      }
-      const setter = (newValue: any) => {
-        if (typeof newValue === 'function') {
-          stateValues[index] = newValue(stateValues[index]);
-        } else {
-          stateValues[index] = newValue;
-        }
-        stateSetters[index](newValue);
-      };
-      return [stateValues[index], setter];
-    },
-  };
+// 謎マナー（custom）は「承知しました」を押すだけでgood(70点)になる。
+// 1件ずつ決定的に進められるため、フロー（進行・合否・やり直し）の検証に使う。
+const customRule = (id: string, description = `謎マナー${id}`): Rule => ({
+  id,
+  description,
+  type: 'custom',
+  difficulty: 1,
 });
 
-function findByType(element: any, type: any): any {
-  if (!element) return undefined;
-  if (element.type === type) return element;
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      const found = findByType(child, type);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
+// お辞儀（tilt）は、傾けずに捺印すればfail(30点)、15度傾けて捺印すればexcellent(100点)にできる。
+const tiltRule = (id: string): Rule => ({
+  id,
+  description: `お辞儀${id}`,
+  type: 'tilt',
+  difficulty: 1,
+  target: 15,
+  tolerance: 5,
+});
 
-function getElementText(element: any): string {
-  if (!element) return '';
-  if (typeof element === 'string') return element;
-  if (typeof element === 'number') return String(element);
-  if (Array.isArray(element)) return element.map(getElementText).join('');
-  if (element.props && element.props.children) return getElementText(element.props.children);
-  return '';
-}
+const stage = (type: StageType, rules: Rule[]): Stage => ({
+  id: `stage-${type}`,
+  type,
+  rules,
+});
 
-function findByText(element: any, text: string): any {
-  if (!element) return undefined;
-  if (typeof element === 'string' || typeof element === 'number') return undefined;
-  const elementText = getElementText(element);
-  if (elementText.includes(text)) {
-    if (element.props && element.props.children) {
-      const children = Array.isArray(element.props.children)
-        ? element.props.children
-        : [element.props.children];
-      for (const child of children) {
-        const found = findByText(child, text);
-        if (found) return found;
-      }
-    }
-    return element;
-  }
-  return undefined;
-}
-
-const testScenario: Scenario = {
+const scenarioOf = (...stages: Stage[]): Scenario => ({
   id: 'test-scenario',
   title: 'テスト案件',
-  description: 'テスト用の案件',
+  description: 'テスト用',
   requiredRank: 0,
-  stages: [
-    {
-      id: 'stage-kito',
-      type: 'kito',
-      rules: [
-        { id: 'kito-angle', description: '角度ルール', type: 'angle', difficulty: 1, target: 0, tolerance: 10 },
-      ],
-    },
-    {
-      id: 'stage-saikan',
-      type: 'saikan',
-      rules: [
-        { id: 'saikan-angle', description: '角度ルール2', type: 'angle', difficulty: 2, target: 0, tolerance: 10 },
-        { id: 'saikan-timing', description: 'タイミングルール', type: 'timing', difficulty: 2, target: 1, tolerance: 0.5 },
-      ],
-    },
-    {
-      id: 'stage-kenetsu',
-      type: 'kenetsu',
-      rules: [
-        {
-          id: 'kenetsu-position',
-          description: '課長印より下に配置',
-          type: 'position',
-          difficulty: 3,
-          target: 1,
-          tolerance: 0.5,
-        },
-        { id: 'kenetsu-custom', description: '謎マナー', type: 'custom', difficulty: 5 },
-      ],
-    },
-  ],
-};
+  stages,
+});
 
-describe('ApplicationStageFlow', () => {
-  beforeEach(() => {
-    useStateCallCount = 0;
-    stateValues = [];
-    stateSetters = [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()]; // stageIndex, ruleIndex, stageResults, allResults, stageJudgement
+function setup(scenario: Scenario) {
+  const onComplete = vi.fn();
+  const onBack = vi.fn();
+  const user = userEvent.setup();
+  render(<ApplicationStageFlow scenario={scenario} onComplete={onComplete} onBack={onBack} />);
+  return { user, onComplete, onBack };
+}
+
+type User = ReturnType<typeof userEvent.setup>;
+
+const accept = (user: User) => user.click(screen.getByRole('button', { name: '承知しました' }));
+
+// お辞儀ミニゲームを15度傾けて捺印する（excellent）
+async function stampTiltPerfectly(user: User) {
+  const stamp = screen.getByRole('button', { name: '鈴木' });
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: stamp, coords: { clientX: 100 } },
+    { target: stamp, coords: { clientX: 130 } },
+    { keys: '[/MouseLeft]' },
+  ]);
+  await user.click(screen.getByRole('button', { name: '捺印する' }));
+}
+
+// 何もせず捺印する（fail）
+const stampTiltBadly = (user: User) => user.click(screen.getByRole('button', { name: '捺印する' }));
+
+describe('ApplicationStageFlow: ルール種別に応じたミニゲームの振り分け', () => {
+  it.each([
+    { type: 'angle', expected: () => screen.getByRole('button', { name: '止める' }) },
+    { type: 'timing', expected: () => screen.getByRole('button', { name: '押し続ける' }) },
+    { type: 'pressure', expected: () => screen.getByRole('button', { name: '押し続ける' }) },
+    { type: 'tilt', expected: () => screen.getByRole('button', { name: '捺印する' }) },
+    { type: 'moving-tap', expected: () => screen.getByRole('button', { name: 'スタンプ！' }) },
+    { type: 'custom', expected: () => screen.getByRole('button', { name: '承知しました' }) },
+  ] as const)('$type のルールは対応するミニゲームを表示する', ({ type, expected }) => {
+    const rule: Rule = { id: 'r', description: 'ルール説明', type, difficulty: 1, target: 1, tolerance: 1 };
+    setup(scenarioOf(stage('kito', [rule])));
+
+    expect(expected()).toBeInTheDocument();
+    expect(screen.getByText('ルール説明')).toBeInTheDocument();
   });
 
-  it('初期状態でステージ1（起票）・1件目のangleルールをRotatingStampMinigameへ渡す', () => {
-    stateValues = [0, 0, [], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
+  it('positionのルールは、説明に「課長印」を含む場合のみ基準マーカーを「課長印」にする', () => {
+    const { unmount } = render(
+      <ApplicationStageFlow
+        scenario={scenarioOf(
+          stage('kenetsu', [
+            { id: 'p', description: '課長印より下に押す', type: 'position', difficulty: 1, target: 1, tolerance: 1 },
+          ]),
+        )}
+        onComplete={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('課長印')).toBeInTheDocument();
+    expect(screen.queryByText('目標位置')).not.toBeInTheDocument();
+    unmount();
 
-    const badge = findByText(result, '起票');
-    expect(badge).toBeDefined();
-
-    const minigame = findByType(result, RotatingStampMinigame as any);
-    expect(minigame).toBeDefined();
-    expect(minigame.props.rule).toBe(testScenario.stages[0].rules[0]);
+    setup(
+      scenarioOf(
+        stage('kito', [
+          { id: 'p', description: '目標位置に合わせる', type: 'position', difficulty: 1, target: 1, tolerance: 1 },
+        ]),
+      ),
+    );
+    expect(screen.getByText('目標位置', { selector: 'span' })).toBeInTheDocument();
   });
+});
 
-  it('起票（ルール1件）完了で即座にstageJudgementが計算される', () => {
-    stateValues = [0, 0, [], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
-
-    const minigame = findByType(result, RotatingStampMinigame as any);
-    minigame.props.onComplete({ actual: 0, score: 'excellent' });
-
-    // 最後のルールなのでruleIndexは進めず、stageJudgementが設定される
-    expect(stateSetters[1]).not.toHaveBeenCalled(); // setRuleIndex は呼ばれない
-    expect(stateSetters[4]).toHaveBeenCalled(); // setStageJudgement
-    const judgement = stateSetters[4].mock.calls[0][0];
-    expect(judgement.passed).toBe(true);
-  });
-
-  it('再鑑（ルール2件）の1件目完了ではまだstageJudgementを計算せずruleIndexを進める', () => {
-    stateValues = [1, 0, [], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
-
-    const minigame = findByType(result, RotatingStampMinigame as any);
-    minigame.props.onComplete({ actual: 0, score: 'excellent' });
-
-    expect(stateSetters[1]).toHaveBeenCalledWith(1); // setRuleIndex(1)
-    expect(stateSetters[4]).not.toHaveBeenCalled(); // setStageJudgementはまだ呼ばれない
-  });
-
-  it('再鑑の2件目（timingルール）はLongPressStampMinigameへ渡される', () => {
-    stateValues = [1, 1, [{ rule: testScenario.stages[1].rules[0], score: 'excellent' }], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
-
-    const minigame = findByType(result, LongPressStampMinigame as any);
-    expect(minigame).toBeDefined();
-    expect(minigame.props.rule).toBe(testScenario.stages[1].rules[1]);
-  });
-
-  it('検閲のpositionルールは「課長印」を含む説明文からreferenceLabelを決定する', () => {
-    stateValues = [2, 0, [], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
-
-    const minigame = findByType(result, DragDropStampMinigame as any);
-    expect(minigame).toBeDefined();
-    expect(minigame.props.referenceLabel).toBe('課長印');
-  });
-
-  it('検閲のcustomルールはCustomRuleStubへ渡される', () => {
-    stateValues = [2, 1, [{ rule: testScenario.stages[2].rules[0], score: 'excellent' }], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
-
-    const stub = findByType(result, CustomRuleStub as any);
-    expect(stub).toBeDefined();
-    expect(stub.props.rule).toBe(testScenario.stages[2].rules[1]);
-  });
-
-  it('CustomRuleStubは承知ボタンでgood評価のonCompleteを呼ぶ', () => {
+describe('CustomRuleStub', () => {
+  it('説明文を表示し、「承知しました」でgood評価のonCompleteを呼ぶ', async () => {
     const onComplete = vi.fn();
-    const result = CustomRuleStub({
-      rule: testScenario.stages[2].rules[1],
-      onComplete,
-    }) as any;
+    const user = userEvent.setup();
+    render(<CustomRuleStub rule={customRule('x', '月齢を考慮してください')} onComplete={onComplete} />);
 
-    const button = findByText(result, '承知しました');
-    expect(button).toBeDefined();
-    button.props.onClick();
+    expect(screen.getByText('月齢を考慮してください')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '承知しました' }));
 
+    expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith({ actual: 0, score: 'good' });
   });
+});
 
-  it('不合格の場合は「このステージをやり直す」ボタンでリセットされる', () => {
-    stateValues = [
-      0,
-      0,
-      [{ rule: testScenario.stages[0].rules[0], score: 'fail' }],
-      [],
-      { overallScore: 30, metricScores: { 格式: null, 礼節: 30, 誠意: null, 精密性: null }, passed: false, comment: 'ng' },
-    ];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
+describe('ApplicationStageFlow: ステージの進行', () => {
+  it('ステージ種別と何件目かを表示し、ルールを1件終えるごとに次の件へ進む', async () => {
+    const { user } = setup(scenarioOf(stage('kito', [customRule('a'), customRule('b')])));
 
-    const retryButton = findByText(result, 'このステージをやり直す');
-    expect(retryButton).toBeDefined();
-    retryButton.props.onClick();
+    expect(screen.getByText('ステージ 1（起票） 1/2件目')).toBeInTheDocument();
+    expect(screen.getByText('謎マナーa')).toBeInTheDocument();
+    // まだステージの判定は出ない
+    expect(screen.queryByText(/合格！|差し戻し！/)).not.toBeInTheDocument();
 
-    expect(stateSetters[1]).toHaveBeenCalledWith(0); // setRuleIndex(0)
-    expect(stateSetters[2]).toHaveBeenCalledWith([]); // setStageResults([])
-    expect(stateSetters[4]).toHaveBeenCalledWith(null); // setStageJudgement(null)
+    await accept(user);
+
+    expect(screen.getByText('ステージ 1（起票） 2/2件目')).toBeInTheDocument();
+    expect(screen.getByText('謎マナーb')).toBeInTheDocument();
   });
 
-  it('合格・最終ステージでない場合は「次のステージへ進む」ボタンで次ステージへ進む', () => {
-    stateValues = [
-      0,
-      0,
-      [{ rule: testScenario.stages[0].rules[0], score: 'excellent' }],
-      [],
-      { overallScore: 100, metricScores: { 格式: null, 礼節: 100, 誠意: null, 精密性: null }, passed: true, comment: 'ok' },
-    ];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete,
-      onBack: vi.fn(),
-    }) as any;
+  it('ステージの全ルールを終えると判定が出る（合格、総合スコア、コメント）', async () => {
+    const { user } = setup(scenarioOf(stage('kito', [customRule('a')])));
 
-    const advanceButton = findByText(result, '次のステージへ進む');
-    expect(advanceButton).toBeDefined();
-    advanceButton.props.onClick();
+    await accept(user);
 
-    expect(stateSetters[0]).toHaveBeenCalledWith(1); // setStageIndex(1)
-    expect(stateSetters[1]).toHaveBeenCalledWith(0); // setRuleIndex(0)
+    expect(screen.getByRole('heading', { name: /合格！.*起票.*総合スコア70点/ })).toBeInTheDocument();
+    expect(screen.getByText('おおむね問題ありません。')).toBeInTheDocument();
+  });
+
+  it('「戻る」ボタンでonBackが呼ばれる', async () => {
+    const { user, onBack } = setup(scenarioOf(stage('kito', [customRule('a')])));
+
+    await user.click(screen.getByRole('button', { name: '戻る' }));
+
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('合格後、最終でないステージは「次のステージへ進む」で次のステージの1件目へ進む', async () => {
+    const { user, onComplete } = setup(
+      scenarioOf(stage('kito', [customRule('a')]), stage('saikan', [customRule('b')])),
+    );
+    await accept(user);
+
+    await user.click(screen.getByRole('button', { name: '次のステージへ進む' }));
+
+    expect(screen.getByText('ステージ 2（再鑑） 1/1件目')).toBeInTheDocument();
+    expect(screen.getByText('謎マナーb')).toBeInTheDocument();
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('合格・最終ステージの場合は「案件をクリアする」ボタンでonCompleteが呼ばれる', () => {
-    stateValues = [
-      2,
-      1,
-      [
-        { rule: testScenario.stages[2].rules[0], score: 'excellent' },
-        { rule: testScenario.stages[2].rules[1], score: 'good' },
-      ],
-      [
-        { rule: testScenario.stages[0].rules[0], score: 'excellent' },
-        { rule: testScenario.stages[1].rules[0], score: 'excellent' },
-        { rule: testScenario.stages[1].rules[1], score: 'excellent' },
-      ],
-      { overallScore: 90, metricScores: { 格式: null, 礼節: null, 誠意: null, 精密性: 90 }, passed: true, comment: 'ok' },
-    ];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete,
-      onBack: vi.fn(),
-    }) as any;
+  it('最終ステージ合格後は「案件をクリアする」で、全ステージ通算の判定を渡してonCompleteが呼ばれる', async () => {
+    const { user, onComplete } = setup(
+      scenarioOf(stage('kito', [customRule('a')]), stage('kenetsu', [tiltRule('t')])),
+    );
+    await accept(user); // 起票: good(70点)
+    await user.click(screen.getByRole('button', { name: '次のステージへ進む' }));
+    await stampTiltPerfectly(user); // 検閲: excellent(100点)
 
-    const clearButton = findByText(result, '案件をクリアする');
-    expect(clearButton).toBeDefined();
-    clearButton.props.onClick();
+    expect(screen.queryByRole('button', { name: '次のステージへ進む' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '案件をクリアする' }));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
-    const finalJudgement = onComplete.mock.calls[0][0];
-    // 全5件（3件excellent + 1件excellent + 1件good）の総合判定
-    expect(finalJudgement.passed).toBe(true);
+    // 通算: (70 + 100) / 2 = 85点。お辞儀(tilt)は礼節の指標になる
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        overallScore: 85,
+        passed: true,
+        metricScores: expect.objectContaining({ 礼節: 100 }),
+      }),
+    );
+  });
+});
+
+describe('ApplicationStageFlow: 不合格（差し戻し）とやり直し', () => {
+  it('総合スコアが合格ラインに届かないと差し戻され、次へ進むボタンは出ない', async () => {
+    const { user, onComplete } = setup(scenarioOf(stage('kito', [tiltRule('t'), customRule('c')])));
+    await stampTiltBadly(user); // fail(30点)
+    await accept(user); // good(70点) → 平均50点 < 60点
+
+    expect(screen.getByRole('heading', { name: /差し戻し！.*起票.*総合スコア50点/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /次のステージへ進む|案件をクリアする/ })).not.toBeInTheDocument();
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('tiltルールはTiltStampMinigameへ渡される', () => {
-    const scenario: Scenario = {
-      id: 'tilt-scenario',
-      title: 'お辞儀捺印テスト案件',
-      description: 'テスト用',
-      requiredRank: 0,
-      stages: [
-        {
-          id: 'stage-tilt',
-          type: 'kito',
-          rules: [
-            { id: 'tilt-rule', description: '傾きルール', type: 'tilt', difficulty: 2, target: 15, tolerance: 5 },
-          ],
-        },
-      ],
-    };
-    stateValues = [0, 0, [], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({ scenario, onComplete: vi.fn(), onBack: vi.fn() }) as any;
+  it('「このステージをやり直す」で最初のルールからやり直し、前回の結果は引き継がない', async () => {
+    const { user, onComplete } = setup(scenarioOf(stage('kito', [tiltRule('t'), customRule('c')])));
+    await stampTiltBadly(user);
+    await accept(user);
 
-    const minigame = findByType(result, TiltStampMinigame as any);
-    expect(minigame).toBeDefined();
-    expect(minigame.props.rule).toBe(scenario.stages[0].rules[0]);
-  });
+    await user.click(screen.getByRole('button', { name: 'このステージをやり直す' }));
 
-  it('moving-tapルールはMovingStampTapMinigameへ渡される', () => {
-    const scenario: Scenario = {
-      id: 'moving-tap-scenario',
-      title: '飛び回る印鑑テスト案件',
-      description: 'テスト用',
-      requiredRank: 0,
-      stages: [
-        {
-          id: 'stage-moving-tap',
-          type: 'kito',
-          rules: [
-            {
-              id: 'moving-tap-rule',
-              description: 'タイミングルール',
-              type: 'moving-tap',
-              difficulty: 2,
-              target: 50,
-              tolerance: 10,
-            },
-          ],
-        },
-      ],
-    };
-    stateValues = [0, 0, [], [], null];
-    useStateCallCount = 0;
-    const result = ApplicationStageFlow({ scenario, onComplete: vi.fn(), onBack: vi.fn() }) as any;
+    // 1件目に戻り、ミニゲームも初期状態になっている
+    expect(screen.getByText('ステージ 1（起票） 1/2件目')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '捺印する' })).toBeEnabled();
 
-    const minigame = findByType(result, MovingStampTapMinigame as any);
-    expect(minigame).toBeDefined();
-    expect(minigame.props.rule).toBe(scenario.stages[0].rules[0]);
-  });
+    // やり直しで満点と普通点を取れば、前回(30点)の影響なく平均85点で合格する
+    await stampTiltPerfectly(user);
+    await accept(user);
+    expect(screen.getByRole('heading', { name: /合格！.*総合スコア85点/ })).toBeInTheDocument();
 
-  it('「戻る」ボタンでonBackが呼ばれる', () => {
-    stateValues = [0, 0, [], [], null];
-    useStateCallCount = 0;
-    const onBack = vi.fn();
-    const result = ApplicationStageFlow({
-      scenario: testScenario,
-      onComplete: vi.fn(),
-      onBack,
-    }) as any;
-
-    const backButton = findByText(result, '戻る');
-    expect(backButton).toBeDefined();
-    backButton.props.onClick();
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: '案件をクリアする' }));
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ overallScore: 85, passed: true }));
   });
 });
