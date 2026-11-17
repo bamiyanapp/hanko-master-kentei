@@ -11,12 +11,14 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'node',
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*'],
       exclude: [
+        'src/setupTests.ts',
         'src/app/layout.tsx',
         'src/app/globals.css',
         // dev-standards共通コンポーネント（shared/pwa/）をbasePath・Tailwind対応の

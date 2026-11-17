@@ -1,34 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ScenarioSelectionScreen from './ScenarioSelectionScreen';
 import type { Scenario } from '@/types/scenario';
-
-// ReactElementツリーを再帰的に走査して、指定した条件に合う要素を探すヘルパー
-// （page.test.tsxと同じ方針: jsdomを使わずReact要素ツリーを直接走査する）
-function findAllButtons(element: any, acc: any[] = []): any[] {
-  if (!element) return acc;
-  if (element.type === 'button') acc.push(element);
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      findAllButtons(child, acc);
-    }
-  }
-  return acc;
-}
-
-function getElementText(element: any): string {
-  if (!element) return '';
-  if (typeof element === 'string') return element;
-  if (typeof element === 'number') return String(element);
-  if (Array.isArray(element)) return element.map(getElementText).join('');
-  if (element.props && element.props.children) {
-    return getElementText(element.props.children);
-  }
-  return '';
-}
 
 const scenarioA: Scenario = {
   id: 'a',
@@ -46,80 +20,92 @@ const scenarioB: Scenario = {
   stages: [],
 };
 
+function renderScreen(
+  overrides: Partial<React.ComponentProps<typeof ScenarioSelectionScreen>> = {},
+) {
+  const onSelect = vi.fn();
+  const onBack = vi.fn();
+  render(
+    <ScenarioSelectionScreen
+      scenarios={[scenarioA, scenarioB]}
+      currentRank={0}
+      clearedScenarioIds={[]}
+      onSelect={onSelect}
+      onBack={onBack}
+      {...overrides}
+    />,
+  );
+  return { onSelect, onBack };
+}
+
 describe('ScenarioSelectionScreen', () => {
-  it('未解放（requiredRankが現在ランクより高い）シナリオを🔒表示・disabledにする', () => {
-    const onSelect = vi.fn();
-    const onBack = vi.fn();
-    const result = ScenarioSelectionScreen({
-      scenarios: [scenarioA, scenarioB],
-      currentRank: 0,
-      clearedScenarioIds: [],
-      onSelect,
-      onBack,
-    }) as any;
+  it('見出しと、全シナリオ＋戻るボタンを表示する', () => {
+    renderScreen();
 
-    const buttons = findAllButtons(result);
+    expect(screen.getByRole('heading', { name: '案件を選択してください' })).toBeInTheDocument();
     // シナリオ数(2) + 戻るボタン(1)
-    expect(buttons.length).toBe(3);
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: '戻る' })).toBeInTheDocument();
+  });
 
-    const lockedButton = buttons.find((b) => getElementText(b).includes('シナリオB'));
-    expect(lockedButton).toBeDefined();
-    expect(lockedButton.props.disabled).toBe(true);
-    expect(getElementText(lockedButton)).toContain('🔒');
+  it('未解放（requiredRankが現在ランクより高い）シナリオを🔒表示・disabledにし、解放条件を示す', () => {
+    renderScreen();
 
-    // disabledなシナリオをクリックしてもonSelectは呼ばれない
-    lockedButton.props.onClick();
+    const locked = screen.getByRole('button', { name: /シナリオB/ });
+    expect(locked).toBeDisabled();
+    expect(locked).toHaveTextContent('🔒');
+    expect(locked).toHaveTextContent('解放条件: ランク5以上');
+    // 未解放の間は説明文を見せない
+    expect(screen.queryByText('description-b')).not.toBeInTheDocument();
+  });
+
+  it('未解放シナリオをクリックしてもonSelectは呼ばれない', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderScreen();
+
+    await user.click(screen.getByRole('button', { name: /シナリオB/ }));
+
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('解放済みシナリオをクリックするとonSelectが呼ばれる', () => {
-    const onSelect = vi.fn();
-    const onBack = vi.fn();
-    const result = ScenarioSelectionScreen({
-      scenarios: [scenarioA, scenarioB],
-      currentRank: 0,
-      clearedScenarioIds: [],
-      onSelect,
-      onBack,
-    }) as any;
+  it('解放済みシナリオは説明文を表示し、クリックするとonSelectがidつきで呼ばれる', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderScreen();
 
-    const buttons = findAllButtons(result);
-    const unlockedButton = buttons.find((b) => getElementText(b).includes('シナリオA'));
-    expect(unlockedButton).toBeDefined();
-    expect(unlockedButton.props.disabled).toBe(false);
+    const unlocked = screen.getByRole('button', { name: /シナリオA/ });
+    expect(unlocked).toBeEnabled();
+    expect(unlocked).toHaveTextContent('description-a');
 
-    unlockedButton.props.onClick();
+    await user.click(unlocked);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith('a');
   });
 
-  it('クリア済みシナリオを✓表示にする', () => {
-    const result = ScenarioSelectionScreen({
-      scenarios: [scenarioA],
-      currentRank: 0,
-      clearedScenarioIds: ['a'],
-      onSelect: vi.fn(),
-      onBack: vi.fn(),
-    }) as any;
+  it('現在ランクがrequiredRank以上になるとシナリオが選択可能になる', () => {
+    renderScreen({ currentRank: 5 });
 
-    const buttons = findAllButtons(result);
-    const clearedButton = buttons.find((b) => getElementText(b).includes('シナリオA'));
-    expect(getElementText(clearedButton)).toContain('✓');
+    expect(screen.getByRole('button', { name: /シナリオB/ })).toBeEnabled();
   });
 
-  it('戻るボタンでonBackが呼ばれる', () => {
-    const onBack = vi.fn();
-    const result = ScenarioSelectionScreen({
-      scenarios: [scenarioA],
+  it('クリア済みシナリオを✓表示にする（クリア済みなら🔒より優先）', () => {
+    renderScreen({
+      scenarios: [scenarioB],
       currentRank: 0,
-      clearedScenarioIds: [],
-      onSelect: vi.fn(),
-      onBack,
-    }) as any;
+      clearedScenarioIds: ['b'],
+    });
 
-    const buttons = findAllButtons(result);
-    const backButton = buttons.find((b) => getElementText(b) === '戻る');
-    expect(backButton).toBeDefined();
-    backButton.props.onClick();
-    expect(onBack).toHaveBeenCalled();
+    const button = screen.getByRole('button', { name: /シナリオB/ });
+    expect(screen.getByLabelText('クリア済み')).toHaveTextContent('✓');
+    expect(button).not.toHaveTextContent('🔒');
+  });
+
+  it('戻るボタンでonBackが呼ばれる', async () => {
+    const user = userEvent.setup();
+    const { onBack } = renderScreen();
+
+    await user.click(screen.getByRole('button', { name: '戻る' }));
+
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
