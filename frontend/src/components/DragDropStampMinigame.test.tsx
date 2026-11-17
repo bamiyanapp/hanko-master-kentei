@@ -1,68 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import DragDropStampMinigame from './DragDropStampMinigame';
 import type { Rule } from '@/types/scenario';
 
-// page.test.tsx等と同じ方針: jsdomを使わず、useState/useEffectをモックして
-// React要素ツリーを直接走査する（本コンポーネントの状態順は
-// dragging, startY, offsetUnits, resultの4つ）。
-let stateValues: any[] = [];
-let stateSetters: any[] = [];
-let useStateCallCount = 0;
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    useState: (initialValue: any) => {
-      const index = useStateCallCount;
-      useStateCallCount++;
-      if (stateValues[index] === undefined) {
-        stateValues[index] = initialValue;
-      }
-      const setter = (newValue: any) => {
-        if (typeof newValue === 'function') {
-          stateValues[index] = newValue(stateValues[index]);
-        } else {
-          stateValues[index] = newValue;
-        }
-        stateSetters[index](newValue);
-      };
-      return [stateValues[index], setter];
-    },
-  };
-});
-
-function findByRole(element: any, role: string): any {
-  if (!element) return undefined;
-  if (element.props && element.props.role === role) return element;
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      const found = findByRole(child, role);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
-// ドロップゾーン（onMouseMove等を持つ最外周のdiv）を取得するヘルパー
-function findDropZone(element: any): any {
-  if (!element) return undefined;
-  if (element.props && typeof element.props.onMouseMove === 'function') return element;
-  if (element.props && element.props.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    for (const child of children) {
-      const found = findDropZone(child);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
+// 実装の定数: 40px = 1単位。目標1・許容差0.5 なので
+// 0.75〜1.25単位(30〜50px)=excellent、0.5〜1.5単位(20〜60px)=good、それ以外=fail
+const PIXELS_PER_UNIT = 40;
 
 const rule: Rule = {
   id: 'test-position',
@@ -73,111 +17,133 @@ const rule: Rule = {
   tolerance: 0.5,
 };
 
+function setup(props: { referenceLabel?: string } = {}) {
+  const onComplete = vi.fn();
+  const user = userEvent.setup();
+  render(<DragDropStampMinigame rule={rule} onComplete={onComplete} {...props} />);
+  const stamp = screen.getByRole('button', { name: '鈴木' });
+  return { user, onComplete, stamp, area: stamp.parentElement as HTMLElement };
+}
+
+type User = ReturnType<typeof userEvent.setup>;
+
+// startYで掴み、endYまでマウスで動かして離す
+async function dragWithMouse(user: User, stamp: HTMLElement, startY: number, endY: number) {
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: stamp, coords: { clientY: startY } },
+    { target: stamp, coords: { clientY: endY } },
+    { keys: '[/MouseLeft]' },
+  ]);
+}
+
+// 印影の縦位置（style）から動いたpx数を読む
+// （jsdomはcalc式の項の順序を正規化して出力するため、形式を決め打ちせずtop宣言内のpx値を読む。
+// 本テストは0以上の位置のみ検証する）
+function stampOffsetPx(stamp: HTMLElement): number {
+  const top = /top:\s*([^;]+)/.exec(stamp.getAttribute('style') ?? '')?.[1];
+  if (top === undefined) throw new Error('印影のtopが設定されていません');
+  const px = /(\d+(?:\.\d+)?)px/.exec(top);
+  return px ? Number(px[1]) : 0;
+}
+
 describe('DragDropStampMinigame', () => {
-  beforeEach(() => {
-    useStateCallCount = 0;
-    stateValues = [];
-    stateSetters = [vi.fn(), vi.fn(), vi.fn(), vi.fn()]; // dragging, startY, offsetUnits, result
+  it('ルールの説明文と、既定の基準マーカー「目標位置」を表示する', () => {
+    setup();
+
+    expect(screen.getByText('テスト用位置合わせルール')).toBeInTheDocument();
+    expect(screen.getByText('目標位置')).toBeInTheDocument();
   });
 
-  it('確定前はドラッグ開始（onMouseDown）でdragging=true・startYが設定される', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const result = DragDropStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('referenceLabelを指定すると基準マーカーの表示に反映される（相対位置制約）', () => {
+    setup({ referenceLabel: '課長印' });
 
-    const stamp = findByRole(result, 'button');
-    expect(stamp).toBeDefined();
-    stamp.props.onMouseDown({ clientY: 100 });
-
-    expect(stateSetters[0]).toHaveBeenCalledWith(true); // setDragging(true)
-    expect(stateSetters[1]).toHaveBeenCalledWith(100); // setStartY(100)
+    expect(screen.getByText('課長印')).toBeInTheDocument();
+    expect(screen.queryByText('目標位置')).not.toBeInTheDocument();
   });
 
-  it('確定済み（result有り）の場合はドラッグ開始しても何も起きない', () => {
-    stateValues = [false, null, 0, { actual: 1, score: 'excellent' }];
-    useStateCallCount = 0;
-    const result = DragDropStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('ドラッグ中は、動かした距離だけ印影が追従する（40pxあたり1単位）', async () => {
+    const { user, stamp } = setup();
+    expect(stampOffsetPx(stamp)).toBe(0);
 
-    const stamp = findByRole(result, 'button');
-    stamp.props.onMouseDown({ clientY: 100 });
-    expect(stateSetters[0]).not.toHaveBeenCalled();
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: stamp, coords: { clientY: 100 } },
+      { target: stamp, coords: { clientY: 140 } },
+    ]);
+
+    expect(stampOffsetPx(stamp)).toBe(40);
   });
 
-  it('ドラッグ中の移動でoffsetUnitsが更新される（40pxあたり1単位）', () => {
-    stateValues = [true, 100, 0, null];
-    useStateCallCount = 0;
-    const result = DragDropStampMinigame({ rule, onComplete: vi.fn() }) as any;
+  it('目標の距離ちょうど（1単位=40px）で離すとexcellentでonCompleteが1回呼ばれる', async () => {
+    const { user, onComplete, stamp } = setup();
 
-    const dropZone = findDropZone(result);
-    expect(dropZone).toBeDefined();
-    dropZone.props.onMouseMove({ clientY: 140 }); // 40px下 = 1単位
+    await dragWithMouse(user, stamp, 100, 100 + PIXELS_PER_UNIT);
 
-    expect(stateSetters[2]).toHaveBeenCalledWith(1);
-  });
-
-  it('dragging=falseの間は移動しても何も起きない', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const result = DragDropStampMinigame({ rule, onComplete: vi.fn() }) as any;
-
-    const dropZone = findDropZone(result);
-    dropZone.props.onMouseMove({ clientY: 140 });
-    expect(stateSetters[2]).not.toHaveBeenCalled();
-  });
-
-  it('ドラッグ終了（onMouseUp）で採点しonCompleteが呼ばれる（目標ちょうどでexcellent）', () => {
-    stateValues = [true, 100, 1, null]; // offsetUnits=1 = target=1ちょうど
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = DragDropStampMinigame({ rule, onComplete }) as any;
-
-    const dropZone = findDropZone(result);
-    dropZone.props.onMouseUp();
-
-    expect(stateSetters[0]).toHaveBeenCalledWith(false); // setDragging(false)
+    expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith({ actual: 1, score: 'excellent' });
   });
 
-  it('dragging=falseの状態でonMouseUpが呼ばれても何も起きない', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = DragDropStampMinigame({ rule, onComplete }) as any;
+  it.each([
+    { px: 24, actual: 0.6, score: 'good' }, // 差0.4: 許容差の半分(0.25)超、許容差(0.5)以内
+    { px: 56, actual: 1.4, score: 'good' }, // 目標より行き過ぎ
+    { px: 0, actual: 0, score: 'fail' }, // 動かさずに離す（差1 > 0.5）
+    { px: 80, actual: 2, score: 'fail' }, // 動かし過ぎ
+    { px: -40, actual: -1, score: 'fail' }, // 逆方向（上）へ動かす
+  ])('$px px動かして離すと「$score」になる', async ({ px, actual, score }) => {
+    const { user, onComplete, stamp } = setup();
 
-    const dropZone = findDropZone(result);
-    dropZone.props.onMouseUp();
+    await dragWithMouse(user, stamp, 100, 100 + px);
+
+    expect(onComplete).toHaveBeenCalledWith({ actual, score });
+  });
+
+  it('掴んでいない状態でマウスを動かしても、印影は動かず確定もしない', async () => {
+    const { user, onComplete, stamp } = setup();
+
+    await user.pointer([{ target: stamp, coords: { clientY: 100 } }, { target: stamp, coords: { clientY: 160 } }]);
+
+    expect(stampOffsetPx(stamp)).toBe(0);
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('目標から大きく外れて確定するとfailでonCompleteが呼ばれる', () => {
-    stateValues = [true, 100, 5, null];
-    useStateCallCount = 0;
-    const onComplete = vi.fn();
-    const result = DragDropStampMinigame({ rule, onComplete }) as any;
+  it('掴んでいない状態で離しても、何も起きない', async () => {
+    const { user, onComplete, stamp } = setup();
 
-    const dropZone = findDropZone(result);
-    dropZone.props.onMouseUp();
+    await user.pointer({ keys: '[/MouseLeft]', target: stamp });
 
-    expect(onComplete).toHaveBeenCalledWith({ actual: 5, score: 'fail' });
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('referenceLabelを指定すると基準マーカーの表示に反映される（相対位置制約の想定）', () => {
-    stateValues = [false, null, 0, null];
-    useStateCallCount = 0;
-    const result = DragDropStampMinigame({
-      rule,
-      referenceLabel: '課長印',
-      onComplete: vi.fn(),
-    }) as any;
+  it('掴んだままエリアの外へマウスが出た場合も、そこで離したものとして確定する', async () => {
+    const { user, onComplete, stamp, area } = setup();
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: stamp, coords: { clientY: 100 } },
+      { target: stamp, coords: { clientY: 140 } },
+    ]);
 
-    function collectText(element: any): string {
-      if (!element) return '';
-      if (typeof element === 'string' || typeof element === 'number') return String(element);
-      if (Array.isArray(element)) return element.map(collectText).join('');
-      if (element.props && element.props.children) return collectText(element.props.children);
-      return '';
-    }
+    fireEvent.mouseLeave(area);
 
-    expect(collectText(result)).toContain('課長印');
+    expect(onComplete).toHaveBeenCalledWith({ actual: 1, score: 'excellent' });
+  });
+
+  it('タッチ操作（スマートフォン）でも、掴んで動かして離すと確定する', () => {
+    const { onComplete, stamp, area } = setup();
+
+    fireEvent.touchStart(stamp, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(area, { touches: [{ clientY: 140 }] });
+    fireEvent.touchEnd(area);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledWith({ actual: 1, score: 'excellent' });
+  });
+
+  it('確定後は、もう一度掴んで動かしても印影は動かず、記録も増えない', async () => {
+    const { user, onComplete, stamp } = setup();
+    await dragWithMouse(user, stamp, 100, 140);
+    const offsetAfterComplete = stampOffsetPx(stamp);
+
+    await dragWithMouse(user, stamp, 100, 220);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(stampOffsetPx(stamp)).toBe(offsetAfterComplete);
   });
 });
